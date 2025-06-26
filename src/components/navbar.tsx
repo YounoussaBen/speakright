@@ -1,7 +1,9 @@
+// src/components/navbar.tsx
 'use client';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/lib/auth-context';
 import {
   BarChart3,
   Building,
@@ -17,18 +19,11 @@ import {
   X,
 } from 'lucide-react';
 import Image from 'next/image';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
-interface NavbarProps {
-  isAuthenticated?: boolean;
-  user?: {
-    name: string;
-    email: string;
-    avatar?: string;
-  };
-}
-
-export function Navbar({ isAuthenticated = false, user }: NavbarProps) {
+export function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [activeLink, setActiveLink] = useState('home');
@@ -40,6 +35,9 @@ export function Navbar({ isAuthenticated = false, user }: NavbarProps) {
     features: false,
     solutions: false,
   });
+
+  const { user, userProfile, loading, logout } = useAuth();
+  const router = useRouter();
 
   const featuresRef = useRef<HTMLDivElement>(null);
   const solutionsRef = useRef<HTMLDivElement>(null);
@@ -124,9 +122,9 @@ export function Navbar({ isAuthenticated = false, user }: NavbarProps) {
   ];
 
   const profileItems = [
-    { icon: User, label: 'Account Info', href: '#account' },
-    { icon: History, label: 'Session History', href: '#history' },
-    { icon: Settings, label: 'Settings', href: '#settings' },
+    { icon: User, label: 'Account Info', href: '/profile' },
+    { icon: History, label: 'Session History', href: '/history' },
+    { icon: Settings, label: 'Settings', href: '/settings' },
   ];
 
   const toggleDropdown = (dropdown: string) => {
@@ -155,6 +153,40 @@ export function Navbar({ isAuthenticated = false, user }: NavbarProps) {
     // Toggle mobile menu
     setIsMobileMenuOpen(!isMobileMenuOpen);
   };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      setOpenDropdown(null);
+      router.push('/');
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+  };
+
+  const handleAuthNavigation = (path: string) => {
+    router.push(path);
+  };
+
+  // Don't render anything while loading auth state
+  if (loading) {
+    return (
+      <nav className="fixed top-0 right-0 left-0 z-50 bg-white/90 backdrop-blur-2xl dark:bg-gray-900/90">
+        <div className="mx-auto max-w-7xl px-6">
+          <div className="flex h-16 items-center justify-between">
+            <div className="flex animate-pulse">
+              <div className="h-8 w-8 rounded-lg bg-gray-200 dark:bg-gray-700"></div>
+              <div className="ml-3 h-5 w-24 rounded bg-gray-200 dark:bg-gray-700"></div>
+            </div>
+            <div className="flex space-x-3">
+              <div className="h-8 w-16 rounded bg-gray-200 dark:bg-gray-700"></div>
+              <div className="h-8 w-20 rounded bg-gray-200 dark:bg-gray-700"></div>
+            </div>
+          </div>
+        </div>
+      </nav>
+    );
+  }
 
   return (
     <>
@@ -200,7 +232,7 @@ export function Navbar({ isAuthenticated = false, user }: NavbarProps) {
           <div className="flex h-16 items-center justify-between">
             {/* Logo & Brand */}
             <div className="flex items-center space-x-8">
-              <div className="group flex cursor-pointer items-center space-x-3">
+              <Link href="/" className="group flex items-center space-x-3">
                 {/* Logo with amazing hover effects */}
                 <div className="relative">
                   <div className="relative overflow-hidden rounded-xl">
@@ -224,12 +256,13 @@ export function Navbar({ isAuthenticated = false, user }: NavbarProps) {
                   {/* Extra sparkle */}
                   <div className="absolute -top-1 -right-1 h-2 w-2 animate-ping rounded-full bg-blue-400 opacity-0 transition-all delay-200 duration-700 group-hover:opacity-60"></div>
                 </div>
-              </div>
+              </Link>
 
               {/* Desktop Navigation */}
               <div className="hidden items-center space-x-1 lg:flex">
                 {/* Record Button */}
-                <button
+                <Link
+                  href="/record"
                   onClick={() => setActiveLink('record')}
                   className="group relative px-4 py-2 text-sm font-medium text-gray-600 transition-colors duration-200 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
                 >
@@ -242,7 +275,7 @@ export function Navbar({ isAuthenticated = false, user }: NavbarProps) {
                     }`}
                   ></div>
                   <div className="absolute inset-0 -z-10 rounded-lg bg-gradient-to-r from-blue-50 to-purple-50 opacity-0 transition-opacity duration-200 group-hover:opacity-100 dark:from-blue-950/20 dark:to-purple-950/20"></div>
-                </button>
+                </Link>
 
                 {/* Features Dropdown */}
                 <div className="relative" ref={featuresRef}>
@@ -261,17 +294,15 @@ export function Navbar({ isAuthenticated = false, user }: NavbarProps) {
                   {openDropdown === 'features' && (
                     <div className="absolute top-full left-0 z-[100] mt-2 w-56 rounded-lg border border-gray-200 bg-white py-2 shadow-lg dark:border-gray-700 dark:bg-gray-800">
                       {featuresItems.map(item => (
-                        <button
+                        <Link
                           key={item.label}
-                          onClick={() => {
-                            window.location.href = item.href;
-                            setOpenDropdown(null);
-                          }}
+                          href={item.href}
+                          onClick={() => setOpenDropdown(null)}
                           className="flex w-full items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
                         >
                           <item.icon className="mr-3 h-4 w-4 text-blue-500" />
                           {item.label}
-                        </button>
+                        </Link>
                       ))}
                     </div>
                   )}
@@ -294,24 +325,23 @@ export function Navbar({ isAuthenticated = false, user }: NavbarProps) {
                   {openDropdown === 'solutions' && (
                     <div className="absolute top-full left-0 z-[100] mt-2 w-56 rounded-lg border border-gray-200 bg-white py-2 shadow-lg dark:border-gray-700 dark:bg-gray-800">
                       {solutionsItems.map(item => (
-                        <button
+                        <Link
                           key={item.label}
-                          onClick={() => {
-                            window.location.href = item.href;
-                            setOpenDropdown(null);
-                          }}
+                          href={item.href}
+                          onClick={() => setOpenDropdown(null)}
                           className="flex w-full items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
                         >
                           <item.icon className="mr-3 h-4 w-4 text-blue-500" />
                           {item.label}
-                        </button>
+                        </Link>
                       ))}
                     </div>
                   )}
                 </div>
 
                 {/* Pricing Button */}
-                <button
+                <Link
+                  href="/pricing"
                   onClick={() => setActiveLink('pricing')}
                   className="group relative px-4 py-2 text-sm font-medium text-gray-600 transition-colors duration-200 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
                 >
@@ -324,25 +354,27 @@ export function Navbar({ isAuthenticated = false, user }: NavbarProps) {
                     }`}
                   ></div>
                   <div className="absolute inset-0 -z-10 rounded-lg bg-gradient-to-r from-blue-50 to-purple-50 opacity-0 transition-opacity duration-200 group-hover:opacity-100 dark:from-blue-950/20 dark:to-purple-950/20"></div>
-                </button>
+                </Link>
               </div>
             </div>
 
             {/* Right Side - Auth & Profile */}
             <div className="flex items-center space-x-4">
-              {!isAuthenticated ? (
+              {!user ? (
                 // Auth Buttons
                 <div className="hidden items-center space-x-3 sm:flex">
                   <Button
+                    onClick={() => handleAuthNavigation('/auth')}
                     variant="ghost"
-                    className="text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
+                    className="relative z-10 text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
                   >
                     Sign In
                   </Button>
-                  <Button className="bg-gradient-to-r from-blue-600 to-purple-600 shadow-lg transition-all duration-300 hover:from-blue-700 hover:to-purple-700 hover:shadow-xl">
-                    <span className="flex items-center space-x-2">
-                      <span>Get Started</span>
-                    </span>
+                  <Button
+                    onClick={() => handleAuthNavigation('/auth')}
+                    className="relative z-10 bg-gradient-to-r from-blue-600 to-purple-600 shadow-lg transition-all duration-300 hover:from-blue-700 hover:to-purple-700 hover:shadow-xl"
+                  >
+                    Get Started
                   </Button>
                 </div>
               ) : (
@@ -353,14 +385,19 @@ export function Navbar({ isAuthenticated = false, user }: NavbarProps) {
                     className="group flex items-center space-x-2 rounded-full p-1 transition-colors duration-200 hover:bg-gray-100 dark:hover:bg-gray-800"
                   >
                     <Avatar className="h-8 w-8 ring-2 ring-transparent transition-all duration-200 group-hover:ring-blue-400">
-                      <AvatarImage src={user?.avatar} alt={user?.name} />
+                      <AvatarImage
+                        src={userProfile?.photoURL}
+                        alt={userProfile?.displayName}
+                      />
                       <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-500 text-sm text-white">
-                        {user?.name?.charAt(0) || 'U'}
+                        {userProfile?.displayName?.charAt(0) ||
+                          user?.email?.charAt(0) ||
+                          'U'}
                       </AvatarFallback>
                     </Avatar>
                     <div className="hidden text-left sm:block">
                       <div className="text-sm font-medium text-gray-900 dark:text-white">
-                        {user?.name || 'User'}
+                        {userProfile?.displayName || user?.email || 'User'}
                       </div>
                     </div>
                   </button>
@@ -370,31 +407,26 @@ export function Navbar({ isAuthenticated = false, user }: NavbarProps) {
                     <div className="absolute top-full right-0 z-[100] mt-2 w-56 rounded-lg border border-gray-200 bg-white py-2 shadow-lg dark:border-gray-700 dark:bg-gray-800">
                       <div className="border-b border-gray-200 px-4 py-2 dark:border-gray-700">
                         <div className="text-sm font-medium text-gray-900 dark:text-white">
-                          {user?.name}
+                          {userProfile?.displayName || 'User'}
                         </div>
                         <div className="text-xs text-gray-500 dark:text-gray-400">
                           {user?.email}
                         </div>
                       </div>
                       {profileItems.map(item => (
-                        <button
+                        <Link
                           key={item.label}
-                          onClick={() => {
-                            window.location.href = item.href;
-                            setOpenDropdown(null);
-                          }}
+                          href={item.href}
+                          onClick={() => setOpenDropdown(null)}
                           className="flex w-full items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
                         >
                           <item.icon className="mr-3 h-4 w-4" />
                           {item.label}
-                        </button>
+                        </Link>
                       ))}
                       <div className="mt-1 border-t border-gray-200 pt-1 dark:border-gray-700">
                         <button
-                          onClick={() => {
-                            // Handle logout
-                            setOpenDropdown(null);
-                          }}
+                          onClick={handleLogout}
                           className="flex w-full items-center px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:text-red-400 dark:hover:bg-gray-700"
                         >
                           <LogOut className="mr-3 h-4 w-4" />
@@ -441,7 +473,8 @@ export function Navbar({ isAuthenticated = false, user }: NavbarProps) {
                 {/* Mobile Navigation Links */}
                 <div className="space-y-2">
                   {/* Record */}
-                  <button
+                  <Link
+                    href="/record"
                     onClick={() => {
                       setActiveLink('record');
                       setIsMobileMenuOpen(false);
@@ -449,7 +482,7 @@ export function Navbar({ isAuthenticated = false, user }: NavbarProps) {
                     className="group flex w-full items-center rounded-lg p-3 text-left text-gray-900 transition-all duration-200 hover:bg-gray-100 dark:text-white dark:hover:bg-gray-800"
                   >
                     <span className="text-lg font-medium">Record</span>
-                  </button>
+                  </Link>
 
                   {/* Features Dropdown */}
                   <div className="space-y-1">
@@ -476,18 +509,16 @@ export function Navbar({ isAuthenticated = false, user }: NavbarProps) {
                     >
                       <div className="space-y-1 pl-4">
                         {featuresItems.map((item, index) => (
-                          <button
+                          <Link
                             key={item.label}
-                            onClick={() => {
-                              window.location.href = item.href;
-                              setIsMobileMenuOpen(false);
-                            }}
+                            href={item.href}
+                            onClick={() => setIsMobileMenuOpen(false)}
                             className="group flex w-full items-center rounded-lg p-3 text-left text-gray-700 transition-all duration-200 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
                             style={{ animationDelay: `${index * 50}ms` }}
                           >
                             <item.icon className="mr-3 h-5 w-5 text-blue-500" />
                             <span className="font-medium">{item.label}</span>
-                          </button>
+                          </Link>
                         ))}
                       </div>
                     </div>
@@ -518,25 +549,24 @@ export function Navbar({ isAuthenticated = false, user }: NavbarProps) {
                     >
                       <div className="space-y-1 pl-4">
                         {solutionsItems.map((item, index) => (
-                          <button
+                          <Link
                             key={item.label}
-                            onClick={() => {
-                              window.location.href = item.href;
-                              setIsMobileMenuOpen(false);
-                            }}
+                            href={item.href}
+                            onClick={() => setIsMobileMenuOpen(false)}
                             className="group flex w-full items-center rounded-lg p-3 text-left text-gray-700 transition-all duration-200 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
                             style={{ animationDelay: `${index * 50}ms` }}
                           >
                             <item.icon className="mr-3 h-5 w-5 text-blue-500" />
                             <span className="font-medium">{item.label}</span>
-                          </button>
+                          </Link>
                         ))}
                       </div>
                     </div>
                   </div>
 
                   {/* Pricing */}
-                  <button
+                  <Link
+                    href="/pricing"
                     onClick={() => {
                       setActiveLink('pricing');
                       setIsMobileMenuOpen(false);
@@ -544,16 +574,29 @@ export function Navbar({ isAuthenticated = false, user }: NavbarProps) {
                     className="group flex w-full items-center rounded-lg p-3 text-left text-gray-900 transition-all duration-200 hover:bg-gray-100 dark:text-white dark:hover:bg-gray-800"
                   >
                     <span className="text-lg font-medium">Pricing</span>
-                  </button>
+                  </Link>
                 </div>
 
                 {/* Mobile Auth Actions */}
-                {!isAuthenticated && (
+                {!user && (
                   <div className="space-y-3 border-t border-gray-200 pt-4 dark:border-gray-700">
-                    <Button variant="outline" className="w-full">
+                    <Button
+                      onClick={() => {
+                        handleAuthNavigation('/auth');
+                        setIsMobileMenuOpen(false);
+                      }}
+                      variant="outline"
+                      className="w-full"
+                    >
                       Sign In
                     </Button>
-                    <Button className="w-full bg-gradient-to-r from-blue-600 to-purple-600">
+                    <Button
+                      onClick={() => {
+                        handleAuthNavigation('/auth');
+                        setIsMobileMenuOpen(false);
+                      }}
+                      className="w-full bg-gradient-to-r from-blue-600 to-purple-600"
+                    >
                       Get Started
                     </Button>
                   </div>

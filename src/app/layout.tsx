@@ -1,5 +1,5 @@
-import { Footer } from '@/components/footer';
-import { Navbar } from '@/components/navbar';
+// src/app/layout.tsx
+import { ConditionalLayout } from '@/components/conditional-layout';
 import { Providers } from '@/components/providers';
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
@@ -27,22 +27,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
         <Providers>
-          <div className="flex min-h-screen flex-col">
-            <Navbar
-              isAuthenticated={false}
-              // For testing authenticated state, you can change to:
-              // isAuthenticated={true}
-              // user={{
-              //   name: 'John Doe',
-              //   email: 'john@example.com',
-              //   avatar: 'https://github.com/shadcn.png',
-              // }}
-            />
-
-            <main className="flex-1">{children}</main>
-
-            <Footer />
-          </div>
+          <ConditionalLayout>{children}</ConditionalLayout>
         </Providers>
       </body>
     </html>
