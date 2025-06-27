@@ -1,13 +1,28 @@
 'use client';
 
 import { useTranscriber } from '@/hooks/useTranscriber';
-import { ArrowLeft, FileText, Mic, Play, RotateCcw, Zap } from 'lucide-react';
+import {
+  formatFileSize,
+  type ProcessedDocument,
+} from '@/lib/document-processor';
+import {
+  ArrowLeft,
+  FileText,
+  Info,
+  Mic,
+  Play,
+  RotateCcw,
+  Upload,
+  Zap,
+} from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 export default function RecordPage() {
   const [selectedText, setSelectedText] = useState('');
   const [uploadedFileName, setUploadedFileName] = useState('');
+  const [processedDocument, setProcessedDocument] =
+    useState<ProcessedDocument | null>(null);
   const [isUploadedFile, setIsUploadedFile] = useState(false);
   const [recordingState, setRecordingState] = useState<
     'idle' | 'recording' | 'processing' | 'completed'
@@ -35,22 +50,36 @@ export default function RecordPage() {
   useEffect(() => {
     const storedText = sessionStorage.getItem('selectedText');
     const storedFileName = sessionStorage.getItem('uploadedFileName');
+    const storedProcessedDocument = sessionStorage.getItem('processedDocument');
 
     if (storedText) {
       setSelectedText(storedText);
     }
 
-    if (storedFileName) {
+    if (storedProcessedDocument) {
+      try {
+        const parsedDocument = JSON.parse(
+          storedProcessedDocument
+        ) as ProcessedDocument;
+        setProcessedDocument(parsedDocument);
+        setIsUploadedFile(true);
+        setUploadedFileName(parsedDocument.fileName);
+      } catch (error) {
+        console.error('Error parsing processed document:', error);
+      }
+    } else if (storedFileName) {
       setUploadedFileName(storedFileName);
       setIsUploadedFile(true);
+      // Legacy fallback for older sessions
       setSelectedText(
-        `This is the extracted content from ${storedFileName}. In a real implementation, this would be the actual text content extracted from the PDF or DOCX file using PDF.js or Mammoth.js. The content would be much longer and contain the actual text that the user wants to practice reading aloud for pronunciation improvement.`
+        storedText ||
+          `This is the extracted content from ${storedFileName}. In a real implementation, this would be the actual text content extracted from the PDF or DOCX file using PDF.js or Mammoth.js.`
       );
     } else {
       setIsUploadedFile(false);
     }
 
-    if (!storedText && !storedFileName) {
+    if (!storedText && !storedFileName && !storedProcessedDocument) {
       router.push('/');
     }
   }, [router]);
@@ -250,6 +279,7 @@ export default function RecordPage() {
   const handleNewText = () => {
     sessionStorage.removeItem('selectedText');
     sessionStorage.removeItem('uploadedFileName');
+    sessionStorage.removeItem('processedDocument');
     router.push('/');
   };
 
@@ -327,7 +357,9 @@ export default function RecordPage() {
                     </div>
                     <div>
                       <h3 className="font-semibold text-gray-900 dark:text-white">
-                        {isUploadedFile ? uploadedFileName : 'Selected Text'}
+                        {isUploadedFile
+                          ? uploadedFileName || 'Uploaded Document'
+                          : 'Selected Text'}
                       </h3>
                       <p className="text-sm text-gray-500 dark:text-gray-400">
                         {words.length} words • ~{Math.ceil(words.length / 180)}{' '}
@@ -344,6 +376,43 @@ export default function RecordPage() {
                   )}
                 </div>
               </div>
+
+              {/* Document Processing Info */}
+              {processedDocument && (
+                <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50/80 p-4 dark:border-blue-800 dark:bg-blue-900/20">
+                  <div className="flex items-start space-x-3">
+                    <Info className="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-500" />
+                    <div className="min-w-0 flex-1">
+                      <h4 className="font-medium text-blue-800 dark:text-blue-200">
+                        Document Information
+                      </h4>
+                      <div className="mt-1 grid grid-cols-2 gap-2 text-sm text-blue-600 dark:text-blue-300">
+                        <div>
+                          <strong>File Size:</strong>{' '}
+                          {formatFileSize(processedDocument.fileSize)}
+                        </div>
+                        <div>
+                          <strong>Word Count:</strong>{' '}
+                          {processedDocument.wordCount.toLocaleString()}
+                        </div>
+                        <div>
+                          <strong>Processing Time:</strong>{' '}
+                          {processedDocument.processingTime}ms
+                        </div>
+                        {processedDocument.originalLength !==
+                          processedDocument.text.length && (
+                          <div className="col-span-2 text-yellow-600 dark:text-yellow-400">
+                            <strong>Note:</strong> Text was truncated from{' '}
+                            {processedDocument.originalLength.toLocaleString()}{' '}
+                            to {processedDocument.text.length.toLocaleString()}{' '}
+                            characters
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="max-h-80 overflow-y-auto">
                 <div className="space-y-1 text-lg leading-relaxed">
@@ -534,6 +603,7 @@ export default function RecordPage() {
                 className="group w-full transform rounded-xl bg-gradient-to-r from-green-600 to-blue-600 px-6 py-4 text-white transition-all duration-300 hover:scale-105 hover:from-green-700 hover:to-blue-700 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100"
               >
                 <div className="flex items-center justify-center space-x-3">
+                  <Upload className="h-5 w-5" />
                   <span className="text-lg font-medium">Upload Audio</span>
                 </div>
               </button>
@@ -607,6 +677,23 @@ export default function RecordPage() {
                       <span className="font-semibold text-purple-600 dark:text-purple-400">
                         {formatTime(recordingTime)}
                       </span>
+                    </div>
+                  )}
+                  {processedDocument && (
+                    <div className="mt-4 border-t border-gray-200 pt-3 dark:border-gray-700">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600 dark:text-gray-400">
+                          Document Words:
+                        </span>
+                        <span className="font-semibold text-indigo-600 dark:text-indigo-400">
+                          {processedDocument.wordCount.toLocaleString()}
+                        </span>
+                      </div>
+                      {processedDocument.isTruncated && (
+                        <div className="mt-2 text-xs text-yellow-600 dark:text-yellow-400">
+                          ⚠️ Original document was truncated for practice
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

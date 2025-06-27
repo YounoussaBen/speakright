@@ -1,12 +1,35 @@
 'use client';
 
-import { ArrowRight, RefreshCw, Upload } from 'lucide-react';
+import {
+  DOCUMENT_LIMITS,
+  formatFileSize,
+  getTextPreview,
+  processDocument,
+  type DocumentError,
+  type ProcessedDocument,
+} from '@/lib/document-processor';
+import {
+  AlertTriangle,
+  ArrowRight,
+  CheckCircle,
+  FileText,
+  Loader2,
+  RefreshCw,
+  Upload,
+  X,
+} from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
 export function HeroSection() {
   const [selectedText, setSelectedText] = useState('');
   const [, setUploadedFile] = useState<File | null>(null);
+  const [processedDocument, setProcessedDocument] =
+    useState<ProcessedDocument | null>(null);
+  const [documentError, setDocumentError] = useState<DocumentError | null>(
+    null
+  );
+  const [isProcessingDocument, setIsProcessingDocument] = useState(false);
   const [currentSampleIndex, setCurrentSampleIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -48,6 +71,8 @@ export function HeroSection() {
     setTimeout(() => {
       // Store selected text in sessionStorage for the record page
       sessionStorage.setItem('selectedText', text);
+      sessionStorage.removeItem('uploadedFileName');
+      sessionStorage.removeItem('processedDocument');
       router.push('/record');
     }, 1000);
   };
@@ -56,21 +81,38 @@ export function HeroSection() {
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = event.target.files?.[0];
-    if (file) {
-      setUploadedFile(file);
-      setIsLoading(true);
+    if (!file) return;
 
-      // TODO: Process file content and extract text
-      setTimeout(() => {
-        // Store file info for the record page
-        sessionStorage.setItem('uploadedFileName', file.name);
-        sessionStorage.setItem(
-          'selectedText',
-          `Content from ${file.name} will be processed...`
-        );
-        router.push('/record');
-      }, 1500);
+    setUploadedFile(file);
+    setDocumentError(null);
+    setProcessedDocument(null);
+    setIsProcessingDocument(true);
+
+    try {
+      const result = await processDocument(file);
+
+      if ('code' in result) {
+        // It's an error
+        setDocumentError(result);
+        setUploadedFile(null);
+      } else {
+        // It's a successful result
+        setProcessedDocument(result);
+        setSelectedText(result.text);
+      }
+    } catch (error) {
+      setDocumentError({
+        code: 'PROCESSING_ERROR',
+        message:
+          error instanceof Error ? error.message : 'Failed to process file',
+      });
+      setUploadedFile(null);
+    } finally {
+      setIsProcessingDocument(false);
     }
+
+    // Clear the input
+    event.target.value = '';
   };
 
   const handleUploadClick = () => {
@@ -85,6 +127,27 @@ export function HeroSection() {
 
   const handleRefreshSamples = () => {
     setCurrentSampleIndex(prev => (prev + 1) % sampleTexts.length);
+  };
+
+  const handleProcessedDocumentSubmit = () => {
+    if (processedDocument) {
+      setIsLoading(true);
+      // Store processed document data
+      sessionStorage.setItem('selectedText', processedDocument.text);
+      sessionStorage.setItem('uploadedFileName', processedDocument.fileName);
+      sessionStorage.setItem(
+        'processedDocument',
+        JSON.stringify(processedDocument)
+      );
+      router.push('/record');
+    }
+  };
+
+  const handleClearUpload = () => {
+    setUploadedFile(null);
+    setProcessedDocument(null);
+    setDocumentError(null);
+    setSelectedText('');
   };
 
   if (isLoading) {
@@ -168,31 +231,144 @@ export function HeroSection() {
               </div>
 
               <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
-                Upload a PDF or DOCX file for pronunciation practice
+                Upload a PDF, DOCX, or TXT file for pronunciation practice
+                <br />
+                <span className="text-xs">
+                  Max size: {formatFileSize(DOCUMENT_LIMITS.MAX_FILE_SIZE)} •
+                  Max length: {DOCUMENT_LIMITS.MAX_WORDS.toLocaleString()} words
+                </span>
               </p>
 
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".pdf,.docx,.doc"
+                accept=".pdf,.docx,.doc,.txt"
                 onChange={handleFileUpload}
                 className="hidden"
               />
 
-              <button
-                onClick={handleUploadClick}
-                className="group flex w-full items-center justify-center space-x-2 rounded-xl border-2 border-dashed border-purple-300 bg-white/50 px-6 py-8 transition-all duration-300 hover:border-purple-400 hover:bg-purple-50 dark:border-purple-600 dark:bg-gray-800/50 dark:hover:border-purple-500 dark:hover:bg-purple-900/20"
-              >
-                <Upload className="h-8 w-8 text-purple-500 transition-transform group-hover:scale-110" />
-                <div className="text-center">
-                  <div className="font-medium text-gray-900 dark:text-white">
-                    Click to upload file
+              {/* Document Error Display */}
+              {documentError && (
+                <div className="mb-4 flex items-start space-x-3 rounded-xl border border-red-200 bg-red-50/80 p-4 dark:border-red-800 dark:bg-red-900/20">
+                  <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-500" />
+                  <div className="flex-1">
+                    <h4 className="font-medium text-red-800 dark:text-red-200">
+                      Processing Error
+                    </h4>
+                    <p className="text-sm text-red-600 dark:text-red-300">
+                      {documentError.message}
+                    </p>
                   </div>
-                  <div className="text-sm text-gray-500 dark:text-gray-400">
-                    PDF, DOCX up to 10MB
+                  <button
+                    onClick={() => setDocumentError(null)}
+                    className="text-red-400 hover:text-red-600"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
+
+              {/* Processing State */}
+              {isProcessingDocument && (
+                <div className="mb-4 flex items-center space-x-3 rounded-xl border border-blue-200 bg-blue-50/80 p-4 dark:border-blue-800 dark:bg-blue-900/20">
+                  <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
+                  <div>
+                    <p className="font-medium text-blue-800 dark:text-blue-200">
+                      Processing Document...
+                    </p>
+                    <p className="text-sm text-blue-600 dark:text-blue-300">
+                      Extracting and analyzing text content
+                    </p>
                   </div>
                 </div>
-              </button>
+              )}
+
+              {/* Processed Document Display */}
+              {processedDocument && (
+                <div className="mb-4 space-y-4">
+                  {/* Document Info */}
+                  <div className="flex items-start space-x-3 rounded-xl border border-green-200 bg-green-50/80 p-4 dark:border-green-800 dark:bg-green-900/20">
+                    <CheckCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-green-500" />
+                    <div className="min-w-0 flex-1">
+                      <h4 className="font-medium text-green-800 dark:text-green-200">
+                        Document Processed Successfully
+                      </h4>
+                      <div className="mt-1 space-y-1 text-sm text-green-600 dark:text-green-300">
+                        <p>
+                          <strong>File:</strong> {processedDocument.fileName}
+                        </p>
+                        <p>
+                          <strong>Size:</strong>{' '}
+                          {formatFileSize(processedDocument.fileSize)}
+                        </p>
+                        <p>
+                          <strong>Words:</strong>{' '}
+                          {processedDocument.wordCount.toLocaleString()}
+                        </p>
+                        <p>
+                          <strong>Processing time:</strong>{' '}
+                          {processedDocument.processingTime}ms
+                        </p>
+                        {processedDocument.isTruncated && (
+                          <p className="text-yellow-600 dark:text-yellow-400">
+                            <strong>Note:</strong> Text was truncated to fit
+                            limits
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleClearUpload}
+                      className="text-green-400 hover:text-green-600"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  {/* Text Preview */}
+                  <div className="rounded-xl border border-gray-200 bg-white/60 p-4 dark:border-gray-600 dark:bg-gray-800/60">
+                    <div className="mb-2 flex items-center space-x-2">
+                      <FileText className="h-4 w-4 text-gray-500" />
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Text Preview
+                      </span>
+                    </div>
+                    <div className="max-h-32 overflow-y-auto">
+                      <p className="text-sm leading-relaxed text-gray-700 dark:text-gray-300">
+                        {getTextPreview(processedDocument.text)}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Action Button */}
+                  <button
+                    onClick={handleProcessedDocumentSubmit}
+                    className="group flex w-full items-center justify-center space-x-2 rounded-xl bg-gradient-to-r from-green-600 to-blue-600 px-6 py-3 text-white transition-all duration-300 hover:from-green-700 hover:to-blue-700 hover:shadow-lg"
+                  >
+                    <span>Practice This Document</span>
+                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                  </button>
+                </div>
+              )}
+
+              {/* Upload Button */}
+              {!processedDocument && !isProcessingDocument && (
+                <button
+                  onClick={handleUploadClick}
+                  className="group flex w-full items-center justify-center space-x-2 rounded-xl border-2 border-dashed border-purple-300 bg-white/50 px-6 py-8 transition-all duration-300 hover:border-purple-400 hover:bg-purple-50 dark:border-purple-600 dark:bg-gray-800/50 dark:hover:border-purple-500 dark:hover:bg-purple-900/20"
+                >
+                  <Upload className="h-8 w-8 text-purple-500 transition-transform group-hover:scale-110" />
+                  <div className="text-center">
+                    <div className="font-medium text-gray-900 dark:text-white">
+                      Click to upload file
+                    </div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">
+                      PDF, DOCX, TXT up to{' '}
+                      {formatFileSize(DOCUMENT_LIMITS.MAX_FILE_SIZE)}
+                    </div>
+                  </div>
+                </button>
+              )}
             </div>
           </div>
 
