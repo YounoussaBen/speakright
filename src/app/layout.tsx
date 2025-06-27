@@ -1,5 +1,5 @@
 // src/app/layout.tsx
-import { ConditionalLayout } from '@/components/conditional-layout';
+import { ConditionalLayout } from '@/components/layout/conditional-layout';
 import { Providers } from '@/components/providers';
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';

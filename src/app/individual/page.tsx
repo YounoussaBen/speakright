@@ -26,11 +26,9 @@ export default function ForIndividualsPage() {
 
   const features = [
     'Unlimited practice sessions',
-    'Real-time pronunciation scoring',
-    'Personalized improvement plans',
-    'Progress tracking dashboard',
-    'Mobile-friendly interface',
-    'Community support access',
+    'Real-time AI feedback',
+    'Mobile & desktop access',
+    'Standard pronunciation library',
   ];
 
   return (

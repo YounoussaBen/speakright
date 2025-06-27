@@ -218,9 +218,7 @@ export function TechnologySection() {
           className={`mt-16 text-center transition-all delay-1000 duration-1000 sm:mt-20 ${
             isVisible ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'
           }`}
-        >
-          s
-        </div>
+        ></div>
       </div>
     </section>
   );

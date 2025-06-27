@@ -1,8 +1,8 @@
 // src/components/conditional-layout.tsx
 'use client';
 
-import { Footer } from '@/components/footer';
-import { Navbar } from '@/components/navbar';
+import { Footer } from '@/components/layout/footer';
+import { Navbar } from '@/components/layout/navbar';
 import { usePathname } from 'next/navigation';
 
 interface ConditionalLayoutProps {

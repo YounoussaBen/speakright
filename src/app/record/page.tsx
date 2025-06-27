@@ -1,16 +1,9 @@
 'use client';
 
-import {
-  ArrowLeft,
-  AudioWaveform,
-  Download,
-  FileText,
-  Mic,
-  RotateCcw,
-  Zap,
-} from 'lucide-react';
+import { useTranscriber } from '@/hooks/useTranscriber';
+import { ArrowLeft, FileText, Mic, Play, RotateCcw, Zap } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 export default function RecordPage() {
   const [selectedText, setSelectedText] = useState('');
@@ -19,10 +12,23 @@ export default function RecordPage() {
   const [recordingState, setRecordingState] = useState<
     'idle' | 'recording' | 'processing' | 'completed'
   >('idle');
-  const [realTimeTranscript, setRealTimeTranscript] = useState('');
   const [finalTranscript, setFinalTranscript] = useState('');
-  const [accuracyScore, setAccuracyScore] = useState(0);
-  const [currentWordIndex, setCurrentWordIndex] = useState(0);
+  const [audioLevel, setAudioLevel] = useState(0);
+  const [, setHasAudio] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const [uploadedAudioUrl, setUploadedAudioUrl] = useState('');
+  const [, setUploadedAudioType] = useState('');
+
+  // Audio recording refs
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const transcriber = useTranscriber();
   const router = useRouter();
 
   // Load text from sessionStorage on component mount
@@ -37,8 +43,6 @@ export default function RecordPage() {
     if (storedFileName) {
       setUploadedFileName(storedFileName);
       setIsUploadedFile(true);
-      // For uploaded files, we would extract content here
-      // For now, using placeholder content
       setSelectedText(
         `This is the extracted content from ${storedFileName}. In a real implementation, this would be the actual text content extracted from the PDF or DOCX file using PDF.js or Mammoth.js. The content would be much longer and contain the actual text that the user wants to practice reading aloud for pronunciation improvement.`
       );
@@ -46,7 +50,6 @@ export default function RecordPage() {
       setIsUploadedFile(false);
     }
 
-    // If no text is available, redirect back to home
     if (!storedText && !storedFileName) {
       router.push('/');
     }
@@ -54,67 +57,210 @@ export default function RecordPage() {
 
   const words = selectedText.split(' ').filter(word => word.trim());
 
-  const handleRecordClick = () => {
+  // Enhanced audio level monitoring with better responsiveness
+  const monitorAudioLevel = useCallback(() => {
+    if (analyserRef.current) {
+      const bufferLength = analyserRef.current.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+      analyserRef.current.getByteFrequencyData(dataArray);
+
+      // Calculate RMS (Root Mean Square) for more accurate audio level
+      let sum = 0;
+      for (let i = 0; i < bufferLength; i++) {
+        sum += (dataArray[i] || 0) * (dataArray[i] || 0);
+      }
+      const rms = Math.sqrt(sum / bufferLength);
+
+      // Normalize and smooth the audio level
+      const normalizedLevel = Math.min(rms / 128, 1); // More sensitive scaling
+      setAudioLevel(normalizedLevel);
+
+      if (recordingState === 'recording') {
+        animationFrameRef.current = requestAnimationFrame(monitorAudioLevel);
+      }
+    }
+  }, [recordingState]);
+
+  // Recording timer
+  useEffect(() => {
+    if (recordingState === 'recording') {
+      timerRef.current = setInterval(() => {
+        setRecordingTime(prev => prev + 1);
+      }, 1000);
+    } else {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+      if (recordingState === 'idle') {
+        setRecordingTime(0);
+      }
+    }
+
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    };
+  }, [recordingState]);
+
+  // Format time function
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Handle recording click
+  const handleRecordClick = async () => {
     if (recordingState === 'idle') {
-      setRecordingState('recording');
-      setRealTimeTranscript('');
-      setCurrentWordIndex(0);
-      console.log('Starting recording...');
+      try {
+        // Start recording
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            sampleRate: 16000,
+            channelCount: 1,
+            echoCancellation: true,
+            noiseSuppression: true,
+          },
+        });
 
-      // Simulate real-time transcription
-      simulateTranscription();
+        streamRef.current = stream;
+
+        // Set up audio analysis for visualization with better settings
+        const audioContext = new AudioContext({ sampleRate: 16000 });
+        const analyser = audioContext.createAnalyser();
+        analyser.fftSize = 256; // Smaller fft for more responsive visualization
+        analyser.smoothingTimeConstant = 0.3; // Less smoothing for more responsive feedback
+        const source = audioContext.createMediaStreamSource(stream);
+        source.connect(analyser);
+
+        audioContextRef.current = audioContext;
+        analyserRef.current = analyser;
+
+        // Set up MediaRecorder
+        const mediaRecorder = new MediaRecorder(stream);
+        mediaRecorderRef.current = mediaRecorder;
+
+        const audioChunks: Blob[] = [];
+        mediaRecorder.ondataavailable = event => {
+          if (event.data.size > 0) {
+            audioChunks.push(event.data);
+          }
+        };
+
+        mediaRecorder.onstop = async () => {
+          const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+          await processAudioForTranscription(audioBlob);
+        };
+
+        mediaRecorder.start(100);
+        setRecordingState('recording');
+        setRecordingTime(0);
+        transcriber.onInputChange();
+
+        // Start audio level monitoring
+        monitorAudioLevel();
+      } catch (error) {
+        console.error('Error accessing microphone:', error);
+      }
     } else if (recordingState === 'recording') {
+      // Stop recording
+      if (mediaRecorderRef.current) {
+        mediaRecorderRef.current.stop();
+      }
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
       setRecordingState('processing');
-      console.log('Stopping recording...');
-
-      // Simulate processing and analysis
-      setTimeout(() => {
-        setFinalTranscript(realTimeTranscript);
-        setAccuracyScore(Math.floor(Math.random() * 15) + 85); // Random score 85-100
-        setRecordingState('completed');
-      }, 3000);
+      setAudioLevel(0);
     }
   };
 
-  const simulateTranscription = () => {
-    let currentIndex = 0;
+  // Process audio for transcription
+  const processAudioForTranscription = async (audioBlob: Blob) => {
+    try {
+      const arrayBuffer = await audioBlob.arrayBuffer();
+      const audioContext = new AudioContext({ sampleRate: 16000 });
+      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
 
-    const interval = setInterval(() => {
-      if (currentIndex < words.length && recordingState === 'recording') {
-        setRealTimeTranscript(
-          prev => prev + (prev ? ' ' : '') + words[currentIndex]
-        );
-        setCurrentWordIndex(currentIndex);
-        currentIndex++;
-      } else {
-        clearInterval(interval);
-      }
-    }, 600);
+      // Start transcription
+      await transcriber.start(audioBuffer);
+      setHasAudio(true);
+    } catch (error) {
+      console.error('Error processing audio:', error);
+      setRecordingState('idle');
+    }
   };
+
+  // Handle file upload
+  const handleFileUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file || !file.type.startsWith('audio/')) return;
+
+    setRecordingState('processing');
+    transcriber.onInputChange();
+
+    // Store uploaded file info for playback
+    const audioUrl = URL.createObjectURL(file);
+    setUploadedAudioUrl(audioUrl);
+    setUploadedAudioType(file.type);
+
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const audioContext = new AudioContext({ sampleRate: 16000 });
+      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+      await transcriber.start(audioBuffer);
+      setHasAudio(true);
+    } catch (error) {
+      console.error('Error processing uploaded file:', error);
+      setRecordingState('idle');
+    }
+
+    event.target.value = '';
+  };
+
+  // Listen to transcriber state changes
+  useEffect(() => {
+    if (transcriber.output?.text) {
+      setFinalTranscript(transcriber.output.text);
+      setRecordingState('completed');
+    }
+  }, [transcriber.output]);
 
   const handleRestart = () => {
     setRecordingState('idle');
-    setRealTimeTranscript('');
     setFinalTranscript('');
-    setCurrentWordIndex(0);
-    setAccuracyScore(0);
+    setAudioLevel(0);
+    setHasAudio(false);
+    setRecordingTime(0);
+    if (uploadedAudioUrl) {
+      URL.revokeObjectURL(uploadedAudioUrl);
+      setUploadedAudioUrl('');
+      setUploadedAudioType('');
+    }
+    transcriber.onInputChange();
   };
 
   const handleNewText = () => {
-    // Clear all session storage
     sessionStorage.removeItem('selectedText');
     sessionStorage.removeItem('uploadedFileName');
     router.push('/');
   };
 
   const handleDownloadReport = () => {
-    // TODO: Generate and download PDF report
-    console.log('Downloading report...');
+    // Placeholder - will be implemented later
+    console.log('Download report - to be implemented');
   };
 
   if (!selectedText) {
     return (
-      <div className="flex min-h-screen items-center justify-center pt-20">
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 pt-20 dark:from-gray-900 dark:to-gray-800">
         <div className="text-center">
           <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-b-2 border-blue-600"></div>
           <p className="text-gray-600 dark:text-gray-400">Loading...</p>
@@ -124,8 +270,20 @@ export default function RecordPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pt-20 dark:bg-gray-900">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 pt-20 dark:from-gray-900 dark:to-gray-800">
+      {/* Blend with navbar */}
+      <div className="pointer-events-none absolute top-0 left-0 h-32 w-full bg-gradient-to-b from-blue-50/30 via-transparent to-transparent dark:from-blue-950/20"></div>
+
       <div className="container mx-auto max-w-7xl px-6 py-8">
+        {/* Hidden file input for upload */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="audio/*"
+          onChange={handleFileUpload}
+          className="hidden"
+        />
+
         {/* Header */}
         <div className="mb-8 flex items-center justify-between">
           <button
@@ -133,23 +291,21 @@ export default function RecordPage() {
             className="flex items-center space-x-2 text-gray-600 transition-colors hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
           >
             <ArrowLeft className="h-4 w-4" />
+            <span>New Text</span>
           </button>
 
           <div className="flex items-center space-x-3">
             {recordingState === 'completed' && (
-              <>
-                <button
-                  onClick={handleDownloadReport}
-                  className="flex items-center space-x-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-all hover:bg-blue-700 hover:shadow-md"
-                >
-                  <Download className="h-4 w-4" />
-                  <span>Download</span>
-                </button>
-              </>
+              <button
+                onClick={handleDownloadReport}
+                className="flex items-center space-x-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-all hover:bg-blue-700 hover:shadow-md"
+              >
+                <span>Download</span>
+              </button>
             )}
             <button
               onClick={handleRestart}
-              className="flex items-center space-x-2 rounded-lg bg-gray-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-all hover:bg-gray-700 hover:shadow-md"
+              className="flex items-center space-x-2 rounded-xl bg-gray-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-all hover:bg-gray-700 hover:shadow-md"
             >
               <RotateCcw className="h-4 w-4" />
               <span>Restart</span>
@@ -162,11 +318,11 @@ export default function RecordPage() {
           {/* Left Column - Text Display */}
           <div className="space-y-6 lg:col-span-2">
             {/* Text Preview */}
-            <div className="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
-              <div className="border-b border-gray-100 px-6 py-4 dark:border-gray-700">
+            <div className="rounded-3xl border border-white/20 bg-gradient-to-br from-blue-50/50 to-purple-50/50 p-6 backdrop-blur-sm dark:border-gray-700/30 dark:from-blue-950/10 dark:to-purple-950/10">
+              <div className="mb-4 border-b border-gray-100/50 pb-4 dark:border-gray-700/30">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
-                    <div className="rounded-lg bg-blue-50 p-2 dark:bg-blue-900/20">
+                    <div className="rounded-lg bg-blue-100/80 p-2 dark:bg-blue-900/30">
                       <FileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                     </div>
                     <div>
@@ -180,7 +336,7 @@ export default function RecordPage() {
                     </div>
                   </div>
                   {isUploadedFile && (
-                    <div className="rounded-full bg-green-50 px-3 py-1 dark:bg-green-900/20">
+                    <div className="rounded-full bg-green-100/80 px-3 py-1 dark:bg-green-900/30">
                       <span className="text-xs font-medium text-green-700 dark:text-green-300">
                         Extracted Content
                       </span>
@@ -189,20 +345,12 @@ export default function RecordPage() {
                 </div>
               </div>
 
-              <div className="max-h-80 overflow-y-auto p-6">
+              <div className="max-h-80 overflow-y-auto">
                 <div className="space-y-1 text-lg leading-relaxed">
                   {words.map((word, index) => (
                     <span
                       key={index}
-                      className={`mr-2 inline-block transition-all duration-300 ${
-                        recordingState === 'recording' &&
-                        index === currentWordIndex
-                          ? 'rounded-md bg-blue-100 px-1 py-0.5 text-blue-900 dark:bg-blue-800/30 dark:text-blue-100'
-                          : recordingState === 'recording' &&
-                              index < currentWordIndex
-                            ? 'text-green-600 dark:text-green-400'
-                            : 'text-gray-700 dark:text-gray-300'
-                      }`}
+                      className="mr-2 inline-block text-gray-700 dark:text-gray-300"
                     >
                       {word}
                     </span>
@@ -211,63 +359,130 @@ export default function RecordPage() {
               </div>
             </div>
 
-            {/* Real-time Transcription */}
-            {(recordingState === 'recording' ||
-              recordingState === 'processing' ||
+            {/* Audio Visualization (shows during recording) */}
+            {recordingState === 'recording' && (
+              <div className="rounded-3xl border border-white/20 bg-gradient-to-br from-red-50/50 to-orange-50/50 p-6 backdrop-blur-sm dark:border-gray-700/30 dark:from-red-950/10 dark:to-orange-950/10">
+                <div className="mb-4 flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className="h-3 w-3 animate-pulse rounded-full bg-red-500"></div>
+                    <h3 className="font-semibold text-red-800 dark:text-red-200">
+                      Recording Audio
+                    </h3>
+                  </div>
+                  <div className="font-mono text-sm font-bold text-red-700 dark:text-red-300">
+                    {formatTime(recordingTime)}
+                  </div>
+                </div>
+
+                {/* Enhanced responsive waveform */}
+                <div className="flex h-16 items-center justify-center space-x-1">
+                  {[...Array(50)].map((_, i) => {
+                    // Create more varied base heights for visual interest
+                    const basePattern = [
+                      12, 16, 24, 20, 32, 18, 36, 28, 40, 22, 44, 26, 38, 30,
+                      42, 34, 28, 24, 20, 16,
+                    ];
+                    const cycleIndex = i % basePattern.length;
+                    const baseHeight = basePattern[cycleIndex] ?? 16;
+
+                    // More responsive to actual audio levels
+                    const audioMultiplier = 1 + audioLevel * 2; // Amplify the audio effect
+                    const randomVariation =
+                      (Math.random() - 0.5) * audioLevel * 20;
+                    const finalHeight =
+                      baseHeight * audioMultiplier + randomVariation;
+
+                    return (
+                      <div
+                        key={i}
+                        className="rounded-full bg-gradient-to-t from-red-500 to-orange-400 transition-all duration-75"
+                        style={{
+                          width: '2px',
+                          height: `${Math.max(8, Math.min(56, finalHeight))}px`,
+                          opacity: 0.6 + audioLevel * 0.4,
+                          transform: `scaleY(${0.7 + audioLevel * 0.8})`,
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Transcription Results */}
+            {(recordingState === 'processing' ||
               recordingState === 'completed') && (
-              <div className="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
-                <div className="border-b border-gray-100 px-6 py-4 dark:border-gray-700">
+              <div className="flex min-h-[400px] flex-col rounded-3xl border border-white/20 bg-gradient-to-br from-green-50/50 to-blue-50/50 p-6 backdrop-blur-sm dark:border-gray-700/30 dark:from-green-950/10 dark:to-blue-950/10">
+                <div className="mb-4 border-b border-gray-100/50 pb-4 dark:border-gray-700/30">
                   <div className="flex items-center space-x-3">
                     <div
                       className={`h-2.5 w-2.5 rounded-full ${
-                        recordingState === 'recording'
-                          ? 'animate-pulse bg-red-500'
-                          : recordingState === 'processing'
-                            ? 'animate-pulse bg-yellow-500'
-                            : 'bg-green-500'
+                        recordingState === 'processing'
+                          ? 'animate-pulse bg-yellow-500'
+                          : 'bg-green-500'
                       }`}
                     ></div>
                     <h3 className="font-semibold text-gray-900 dark:text-white">
-                      {recordingState === 'recording'
-                        ? 'Live Transcription'
-                        : recordingState === 'processing'
-                          ? 'Processing Speech'
-                          : 'Final Transcription'}
+                      {recordingState === 'processing'
+                        ? 'Processing Speech'
+                        : 'Transcription Result'}
                     </h3>
                   </div>
                 </div>
 
-                <div className="p-6">
-                  <div className="min-h-[100px] rounded-xl bg-gray-50 p-4 dark:bg-gray-900/50">
-                    <p className="text-gray-800 dark:text-gray-200">
-                      {recordingState === 'completed'
-                        ? finalTranscript
-                        : realTimeTranscript || (
-                            <span className="text-gray-400 italic">
-                              {recordingState === 'processing'
-                                ? 'Processing your speech...'
-                                : 'Your speech will appear here...'}
-                            </span>
-                          )}
-                      {recordingState === 'recording' && (
-                        <span className="ml-1 animate-pulse text-blue-500">
-                          |
-                        </span>
-                      )}
-                    </p>
-                  </div>
+                <div className="flex flex-1 flex-col">
+                  {recordingState === 'processing' ? (
+                    <div className="flex min-h-[300px] flex-1 items-center justify-center rounded-xl bg-white/60 p-6 dark:bg-gray-800/60">
+                      <div className="text-center">
+                        <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-b-2 border-blue-600"></div>
+                        <p className="text-gray-400 italic">
+                          {transcriber.isModelLoading
+                            ? `Loading AI model... ${Math.round(transcriber.modelLoadingProgress)}%`
+                            : 'Analyzing your speech...'}
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="min-h-[300px] flex-1 rounded-xl bg-white/60 p-6 dark:bg-gray-800/60">
+                      <p className="leading-relaxed text-gray-800 dark:text-gray-200">
+                        {finalTranscript}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Model Loading Progress */}
+            {transcriber.isModelLoading && (
+              <div className="rounded-3xl border border-white/20 bg-gradient-to-br from-blue-50/50 to-purple-50/50 p-4 backdrop-blur-sm dark:border-gray-700/30 dark:from-blue-950/10 dark:to-purple-950/10">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="font-medium text-blue-800 dark:text-blue-200">
+                    Loading AI Model...
+                  </span>
+                  <span className="text-blue-600 dark:text-blue-300">
+                    {Math.round(transcriber.modelLoadingProgress)}%
+                  </span>
+                </div>
+                <div className="mt-2 h-2 w-full rounded-full bg-blue-200/50 dark:bg-blue-800/30">
+                  <div
+                    className="h-2 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-300"
+                    style={{ width: `${transcriber.modelLoadingProgress}%` }}
+                  />
                 </div>
               </div>
             )}
           </div>
 
-          {/* Right Column - Recording Controls & Visualization */}
+          {/* Right Column - Recording Controls & Upload */}
           <div className="space-y-6">
             {/* Recording Button */}
-            <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center shadow-sm dark:border-gray-700 dark:bg-gray-800">
+            <div className="rounded-3xl border border-white/20 bg-gradient-to-br from-blue-50/50 to-purple-50/50 p-8 text-center backdrop-blur-sm dark:border-gray-700/30 dark:from-blue-950/10 dark:to-purple-950/10">
               <button
                 onClick={handleRecordClick}
-                disabled={recordingState === 'processing'}
+                disabled={
+                  recordingState === 'processing' || transcriber.isModelLoading
+                }
                 className={`group relative transform rounded-full p-8 transition-all duration-300 hover:scale-105 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100 ${
                   recordingState === 'recording'
                     ? 'bg-red-500 shadow-lg shadow-red-500/25 hover:bg-red-600'
@@ -278,13 +493,13 @@ export default function RecordPage() {
                         : 'bg-blue-500 shadow-lg shadow-blue-500/25 hover:bg-blue-600'
                 }`}
               >
-                {/* Pulsing ring for recording state */}
                 {recordingState === 'recording' && (
                   <div className="absolute inset-0 animate-ping rounded-full bg-red-400 opacity-20"></div>
                 )}
 
                 <div className="relative">
-                  {recordingState === 'processing' ? (
+                  {recordingState === 'processing' ||
+                  transcriber.isModelLoading ? (
                     <div className="animate-spin">
                       <Zap className="h-12 w-12 text-white" />
                     </div>
@@ -300,70 +515,67 @@ export default function RecordPage() {
                   {recordingState === 'recording' &&
                     'Recording... Click to stop'}
                   {recordingState === 'processing' &&
-                    'Processing your speech...'}
+                    (transcriber.isModelLoading
+                      ? 'Loading AI model...'
+                      : 'Processing your speech...')}
                   {recordingState === 'completed' && 'Recording completed!'}
                 </p>
-                {recordingState === 'recording' && (
-                  <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                    Word {currentWordIndex + 1} of {words.length}
-                  </p>
-                )}
               </div>
             </div>
 
-            {/* Waveform Visualization */}
-            <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-              <div className="mb-6 flex items-center space-x-3">
-                <div className="rounded-lg bg-purple-50 p-2 dark:bg-purple-900/20">
-                  <AudioWaveform className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+            {/* Upload Interface - New Design */}
+            <div className="rounded-3xl border border-white/20 bg-gradient-to-br from-green-50/50 to-blue-50/50 p-8 text-center backdrop-blur-sm dark:border-gray-700/30 dark:from-green-950/10 dark:to-blue-950/10">
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={
+                  recordingState === 'recording' ||
+                  recordingState === 'processing'
+                }
+                className="group w-full transform rounded-xl bg-gradient-to-r from-green-600 to-blue-600 px-6 py-4 text-white transition-all duration-300 hover:scale-105 hover:from-green-700 hover:to-blue-700 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100"
+              >
+                <div className="flex items-center justify-center space-x-3">
+                  <span className="text-lg font-medium">Upload Audio</span>
                 </div>
-                <h3 className="font-semibold text-gray-900 dark:text-white">
-                  Audio Visualization
-                </h3>
-              </div>
+              </button>
 
-              {/* Waveform Display */}
-              <div className="mb-6 flex h-24 items-end justify-center space-x-1">
-                {[...Array(20)].map((_, i) => {
-                  const heights = [
-                    15, 25, 35, 45, 55, 45, 65, 55, 60, 50, 70, 60, 55, 58, 48,
-                    52, 40, 32, 45, 30,
-                  ];
-                  return (
-                    <div
-                      key={i}
-                      className={`rounded-full transition-all duration-1000 ${
-                        recordingState === 'recording'
-                          ? 'animate-pulse bg-red-500'
-                          : recordingState === 'processing'
-                            ? 'animate-pulse bg-yellow-500'
-                            : recordingState === 'completed'
-                              ? 'bg-green-500'
-                              : 'bg-blue-500'
-                      }`}
-                      style={{
-                        width: '4px',
-                        height: `${heights[i]}px`,
-                        opacity:
-                          recordingState === 'recording'
-                            ? 0.6 + (i % 3) * 0.2
-                            : 0.4 + (i % 2) * 0.2,
-                        animationDelay:
-                          recordingState === 'recording'
-                            ? `${i * 50}ms`
-                            : '0ms',
-                      }}
-                    />
-                  );
-                })}
-              </div>
+              <p className="mt-3 text-sm text-gray-600 dark:text-gray-400">
+                or drop file here
+              </p>
+
+              {/* Uploaded Audio Player */}
+              {uploadedAudioUrl && recordingState === 'completed' && (
+                <div className="mt-4 rounded-xl bg-white/60 p-4 dark:bg-gray-800/60">
+                  <div className="mb-2 flex items-center space-x-2">
+                    <Play className="h-4 w-4 text-green-600" />
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Uploaded Audio
+                    </span>
+                  </div>
+                  <audio controls className="w-full" src={uploadedAudioUrl}>
+                    Your browser does not support the audio element.
+                  </audio>
+                </div>
+              )}
+            </div>
+
+            {/* Pro Tips */}
+            <div className="rounded-3xl border border-white/20 bg-gradient-to-br from-yellow-50/50 to-orange-50/50 p-6 backdrop-blur-sm dark:border-gray-700/30 dark:from-yellow-950/10 dark:to-orange-950/10">
+              <h3 className="mb-3 text-sm font-semibold text-yellow-800 dark:text-yellow-200">
+                💡 Pro Tips
+              </h3>
+              <ul className="space-y-2 text-sm text-yellow-700 dark:text-yellow-300">
+                <li>• Speak clearly and at a moderate pace</li>
+                <li>• Ensure you&apos;re in a quiet environment</li>
+                <li>• Hold your device 6-8 inches from your mouth</li>
+                <li>• Practice difficult words multiple times</li>
+              </ul>
             </div>
 
             {/* Session Summary */}
             {recordingState === 'completed' && (
-              <div className="rounded-2xl border border-green-200 bg-gradient-to-br from-green-50 to-blue-50 p-6 shadow-sm dark:border-green-700/30 dark:from-green-900/10 dark:to-blue-900/10">
+              <div className="rounded-3xl border border-white/20 bg-gradient-to-br from-green-50/50 to-blue-50/50 p-6 backdrop-blur-sm dark:border-gray-700/30 dark:from-green-950/10 dark:to-blue-950/10">
                 <div className="mb-4 flex items-center space-x-3">
-                  <div className="rounded-lg bg-green-100 p-2 dark:bg-green-900/30">
+                  <div className="rounded-lg bg-green-100/80 p-2 dark:bg-green-900/30">
                     <div className="h-5 w-5 rounded-full bg-green-500"></div>
                   </div>
                   <h3 className="font-semibold text-gray-900 dark:text-white">
@@ -373,28 +585,30 @@ export default function RecordPage() {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-600 dark:text-gray-400">
-                      Accuracy Score:
+                      Words Transcribed:
                     </span>
-                    <span className="font-semibold text-green-600 dark:text-green-400">
-                      {accuracyScore}%
+                    <span className="font-semibold text-blue-600 dark:text-blue-400">
+                      {finalTranscript.split(' ').filter(w => w.trim()).length}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-600 dark:text-gray-400">
-                      Words Read:
+                      Original Words:
                     </span>
-                    <span className="font-semibold text-blue-600 dark:text-blue-400">
+                    <span className="font-semibold text-green-600 dark:text-green-400">
                       {words.length}
                     </span>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600 dark:text-gray-400">
-                      Duration:
-                    </span>
-                    <span className="font-semibold text-purple-600 dark:text-purple-400">
-                      ~{Math.ceil(words.length / 180)} min
-                    </span>
-                  </div>
+                  {recordingTime > 0 && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600 dark:text-gray-400">
+                        Recording Duration:
+                      </span>
+                      <span className="font-semibold text-purple-600 dark:text-purple-400">
+                        {formatTime(recordingTime)}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

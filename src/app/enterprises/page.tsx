@@ -34,13 +34,15 @@ export default function ForProfessionalsPage() {
 
   const professionalFeatures = [
     'Industry-specific vocabulary training',
-    'Presentation skills enhancement',
-    'Accent reduction programs',
-    'Public speaking confidence',
-    'Meeting facilitation skills',
-    'Cross-cultural communication',
-    'Executive coaching integration',
-    'ROI tracking and analytics',
+    'Advanced analytics & reporting',
+    'Custom branding options',
+    'API integration access',
+    'Priority customer support',
+    'Bulk user management',
+    'Custom pronunciation libraries',
+    'Dedicated account manager',
+    'Training & onboarding',
+    'SLA guarantee',
   ];
 
   return (

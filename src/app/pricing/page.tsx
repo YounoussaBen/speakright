@@ -28,24 +28,18 @@ export default function PricingPage() {
   const individualFeatures = [
     'Unlimited practice sessions',
     'Real-time AI feedback',
-    'Progress tracking dashboard',
-    'Multiple language support',
     'Mobile & desktop access',
-    'Community support',
-    'Basic analytics',
     'Standard pronunciation library',
   ];
 
   const enterpriseFeatures = [
     'Everything in Individual',
-    'Team management dashboard',
     'Advanced analytics & reporting',
     'Custom branding options',
     'API integration access',
     'Priority customer support',
     'Bulk user management',
     'Custom pronunciation libraries',
-    'SSO integration',
     'Dedicated account manager',
     'Training & onboarding',
     'SLA guarantee',
@@ -269,17 +263,17 @@ export default function PricingPage() {
 
             <div className="rounded-3xl border border-blue-100 bg-gradient-to-br from-blue-50 to-purple-50 p-8">
               <h3 className="mb-6 text-2xl font-bold text-gray-900">
-                Get Enterprise Quote
+                Get A Quote
               </h3>
               <form className="space-y-4">
                 <div>
                   <label className="mb-2 block text-sm font-medium text-gray-700">
-                    Company Name
+                    Name
                   </label>
                   <input
                     type="text"
                     className="w-full rounded-xl border border-gray-200 px-4 py-3 transition-all duration-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                    placeholder="Your company name"
+                    placeholder="Your name"
                   />
                 </div>
                 <div>
@@ -291,17 +285,6 @@ export default function PricingPage() {
                     className="w-full rounded-xl border border-gray-200 px-4 py-3 transition-all duration-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                     placeholder="your@email.com"
                   />
-                </div>
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">
-                    Team Size
-                  </label>
-                  <select className="w-full rounded-xl border border-gray-200 px-4 py-3 transition-all duration-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200">
-                    <option>1-10 employees</option>
-                    <option>11-50 employees</option>
-                    <option>51-200 employees</option>
-                    <option>200+ employees</option>
-                  </select>
                 </div>
                 <button
                   type="submit"

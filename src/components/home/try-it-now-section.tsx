@@ -30,7 +30,7 @@ export function TryItNowSection() {
         {/* Main CTA Content */}
         <div className="mx-auto max-w-4xl">
           {/* Central CTA Card */}
-          <div className="relative overflow-hidden rounded-2xl border border-white/20 bg-white/70 p-4 shadow-lg backdrop-blur-sm sm:rounded-3xl sm:p-6 lg:p-8 xl:p-12 dark:border-gray-700/30 dark:bg-gray-800/70">
+          <div className="relative overflow-hidden rounded-3xl border border-white/20 bg-gradient-to-br from-blue-50/50 to-purple-50/50 p-4 backdrop-blur-sm sm:p-6 lg:p-8 xl:p-12 dark:border-gray-700/30 dark:from-blue-950/10 dark:to-purple-950/10">
             {/* Background Elements */}
             <div className="absolute top-0 left-0 h-full w-full opacity-5">
               <svg className="h-full w-full" viewBox="0 0 400 300">
@@ -94,30 +94,30 @@ export function TryItNowSection() {
               {/* Right Visual */}
               <div className="relative order-1 lg:order-2">
                 {/* Mock Interface Preview */}
-                <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:rounded-2xl sm:p-6 dark:border-gray-700 dark:bg-gray-800">
+                <div className="rounded-3xl border border-white/20 bg-gradient-to-br from-white/60 to-blue-50/50 p-4 backdrop-blur-sm sm:p-6 dark:border-gray-700/30 dark:from-gray-800/60 dark:to-blue-950/10">
                   {/* Mock Text Display */}
                   <div className="mb-3 flex items-center space-x-2 sm:mb-4 sm:space-x-3">
-                    <div className="rounded-md bg-blue-50 p-1.5 sm:rounded-lg sm:p-2 dark:bg-blue-900/20">
+                    <div className="rounded-lg bg-blue-100/80 p-1.5 sm:p-2 dark:bg-blue-900/30">
                       <AudioWaveform className="h-3 w-3 text-blue-600 sm:h-4 sm:w-4 dark:text-blue-400" />
                     </div>
                     <div className="flex-1">
-                      <div className="h-1.5 w-16 rounded bg-gray-200 sm:h-2 sm:w-20 dark:bg-gray-600"></div>
-                      <div className="mt-1 h-1 w-12 rounded bg-gray-100 sm:h-1.5 sm:w-16 dark:bg-gray-700"></div>
+                      <div className="h-1.5 w-16 rounded bg-gray-200/80 sm:h-2 sm:w-20 dark:bg-gray-600/80"></div>
+                      <div className="mt-1 h-1 w-12 rounded bg-gray-100/80 sm:h-1.5 sm:w-16 dark:bg-gray-700/80"></div>
                     </div>
                   </div>
 
                   {/* Mock Text Lines */}
                   <div className="space-y-1.5 sm:space-y-2">
                     <div className="flex space-x-1.5 sm:space-x-2">
-                      <div className="h-1.5 w-12 rounded bg-green-200 sm:h-2 sm:w-16 dark:bg-green-800"></div>
-                      <div className="h-1.5 w-8 rounded bg-green-200 sm:h-2 sm:w-12 dark:bg-green-800"></div>
-                      <div className="h-1.5 w-16 rounded bg-blue-200 sm:h-2 sm:w-20 dark:bg-blue-800"></div>
-                      <div className="h-1.5 w-10 rounded bg-gray-200 sm:h-2 sm:w-14 dark:bg-gray-600"></div>
+                      <div className="h-1.5 w-12 rounded bg-green-200/80 sm:h-2 sm:w-16 dark:bg-green-800/80"></div>
+                      <div className="h-1.5 w-8 rounded bg-green-200/80 sm:h-2 sm:w-12 dark:bg-green-800/80"></div>
+                      <div className="h-1.5 w-16 rounded bg-blue-200/80 sm:h-2 sm:w-20 dark:bg-blue-800/80"></div>
+                      <div className="h-1.5 w-10 rounded bg-gray-200/80 sm:h-2 sm:w-14 dark:bg-gray-600/80"></div>
                     </div>
                     <div className="flex space-x-1.5 sm:space-x-2">
-                      <div className="h-1.5 w-14 rounded bg-green-200 sm:h-2 sm:w-18 dark:bg-green-800"></div>
-                      <div className="h-1.5 w-8 rounded bg-yellow-200 sm:h-2 sm:w-10 dark:bg-yellow-800"></div>
-                      <div className="h-1.5 w-12 rounded bg-gray-200 sm:h-2 sm:w-16 dark:bg-gray-600"></div>
+                      <div className="h-1.5 w-14 rounded bg-green-200/80 sm:h-2 sm:w-18 dark:bg-green-800/80"></div>
+                      <div className="h-1.5 w-8 rounded bg-yellow-200/80 sm:h-2 sm:w-10 dark:bg-yellow-800/80"></div>
+                      <div className="h-1.5 w-12 rounded bg-gray-200/80 sm:h-2 sm:w-16 dark:bg-gray-600/80"></div>
                     </div>
                   </div>
 
@@ -130,10 +130,10 @@ export function TryItNowSection() {
                 </div>
 
                 {/* Floating Elements - Hidden on very small screens */}
-                <div className="absolute -top-2 -right-2 hidden rounded-full bg-green-100 p-1.5 shadow-lg sm:-top-3 sm:-right-3 sm:block sm:p-2 dark:bg-green-900/30">
+                <div className="absolute -top-2 -right-2 hidden rounded-full bg-green-100/80 p-1.5 shadow-lg sm:-top-3 sm:-right-3 sm:block sm:p-2 dark:bg-green-900/30">
                   <Zap className="h-3 w-3 text-green-600 sm:h-4 sm:w-4 dark:text-green-400" />
                 </div>
-                <div className="absolute -bottom-2 -left-2 hidden rounded-full bg-blue-100 p-1.5 shadow-lg sm:-bottom-3 sm:-left-3 sm:block sm:p-2 dark:bg-blue-900/30">
+                <div className="absolute -bottom-2 -left-2 hidden rounded-full bg-blue-100/80 p-1.5 shadow-lg sm:-bottom-3 sm:-left-3 sm:block sm:p-2 dark:bg-blue-900/30">
                   <Target className="h-3 w-3 text-blue-600 sm:h-4 sm:w-4 dark:text-blue-400" />
                 </div>
               </div>

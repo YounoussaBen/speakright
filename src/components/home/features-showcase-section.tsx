@@ -13,7 +13,7 @@ export function FeaturesShowcaseSection() {
           {['θɪŋk', 'prɪti', 'wɜːrd'].map((phoneme, i) => (
             <div
               key={i}
-              className="rounded-full bg-blue-100 px-2 py-1 font-mono text-xs text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
+              className="rounded-full bg-blue-100/80 px-2 py-1 font-mono text-xs text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
             >
               {phoneme}
             </div>
@@ -25,7 +25,7 @@ export function FeaturesShowcaseSection() {
       icon: BarChart3,
       title: 'Real-time Feedback',
       description:
-        'Get instant visual feedback as you speak with live transcription.',
+        'Get instant visual feedback as you speak with automatic transcription.',
       color: 'purple',
       stats: '<100ms Latency',
       demo: (
@@ -81,9 +81,9 @@ export function FeaturesShowcaseSection() {
         {/* Section Header */}
         <div className="mb-16 text-center">
           <h2 className="text-3xl font-bold text-gray-900 lg:text-5xl dark:text-white">
-            Powerful Features for{' '}
+            Speak Clearly{' '}
             <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              Perfect Pronunciation
+              Learn Confidently
             </span>
           </h2>
           <p className="mt-4 text-lg text-gray-600 dark:text-gray-300">
@@ -97,11 +97,11 @@ export function FeaturesShowcaseSection() {
           {features.map((feature, index) => (
             <div
               key={index}
-              className="group relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-8 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg dark:border-gray-700 dark:bg-gray-800"
+              className={`group relative overflow-hidden rounded-3xl border border-white/20 bg-gradient-to-br from-${feature.color}-50/50 to-white/50 p-8 backdrop-blur-sm transition-all duration-300 hover:scale-105 dark:border-gray-700/30 dark:from-${feature.color}-950/10 dark:to-gray-800/50`}
             >
               {/* Feature Icon */}
               <div
-                className={`mb-6 inline-flex rounded-xl p-3 bg-${feature.color}-50 dark:bg-${feature.color}-900/20`}
+                className={`mb-6 inline-flex rounded-xl p-3 bg-${feature.color}-100/80 dark:bg-${feature.color}-900/30`}
               >
                 <feature.icon
                   className={`h-8 w-8 text-${feature.color}-600 dark:text-${feature.color}-400`}
@@ -121,21 +121,16 @@ export function FeaturesShowcaseSection() {
               {/* Stats */}
               <div className="mb-6">
                 <div
-                  className={`inline-flex rounded-full px-3 py-1 text-sm font-medium bg-${feature.color}-100 text-${feature.color}-700 dark:bg-${feature.color}-900/30 dark:text-${feature.color}-300`}
+                  className={`inline-flex rounded-full px-3 py-1 text-sm font-medium bg-${feature.color}-100/80 text-${feature.color}-700 dark:bg-${feature.color}-900/30 dark:text-${feature.color}-300`}
                 >
                   {feature.stats}
                 </div>
               </div>
 
               {/* Interactive Demo */}
-              <div className="rounded-lg bg-gray-50 p-4 dark:bg-gray-700/50">
+              <div className="rounded-xl bg-white/60 p-4 dark:bg-gray-800/60">
                 {feature.demo}
               </div>
-
-              {/* Hover Effect */}
-              <div
-                className={`absolute inset-0 -z-10 bg-gradient-to-br from-${feature.color}-50 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 dark:from-${feature.color}-900/10`}
-              ></div>
             </div>
           ))}
         </div>
