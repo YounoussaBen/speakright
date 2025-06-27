@@ -99,7 +99,7 @@ export default function ForIndividualsPage() {
                 </span>
               </h2>
               <p className="mb-8 text-lg text-gray-600">
-                Get access to all premium features designed to accelerate your
+                Get access to all features designed to accelerate your
                 pronunciation learning journey.
               </p>
 
