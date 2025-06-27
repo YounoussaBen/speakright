@@ -12,7 +12,6 @@ import {
   LogOut,
   Menu,
   Mic,
-  Settings,
   TrendingUp,
   User,
   Users,
@@ -124,7 +123,6 @@ export function Navbar() {
   const profileItems = [
     { icon: User, label: 'Account Info', href: '/profile' },
     { icon: History, label: 'Session History', href: '/history' },
-    { icon: Settings, label: 'Settings', href: '/settings' },
   ];
 
   const toggleDropdown = (dropdown: string) => {
