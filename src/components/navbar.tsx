@@ -5,14 +5,11 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/auth-context';
 import {
-  BarChart3,
   Building,
   ChevronDown,
   History,
   LogOut,
   Menu,
-  Mic,
-  TrendingUp,
   User,
   Users,
   X,
@@ -107,12 +104,6 @@ export function Navbar() {
       setMobileDropdowns({ features: false, solutions: false });
     }
   }, [isMobileMenuOpen]);
-
-  const featuresItems = [
-    { icon: Mic, label: 'Speech Analysis', href: '#speech-analysis' },
-    { icon: BarChart3, label: 'Real-time Feedback', href: '#feedback' },
-    { icon: TrendingUp, label: 'Progress Tracking', href: '#progress' },
-  ];
 
   const solutionsItems = [
     { icon: User, label: 'For Individuals', href: '#individuals' },
@@ -274,37 +265,6 @@ export function Navbar() {
                   ></div>
                   <div className="absolute inset-0 -z-10 rounded-lg bg-gradient-to-r from-blue-50 to-purple-50 opacity-0 transition-opacity duration-200 group-hover:opacity-100 dark:from-blue-950/20 dark:to-purple-950/20"></div>
                 </Link>
-
-                {/* Features Dropdown */}
-                <div className="relative" ref={featuresRef}>
-                  <button
-                    onClick={() => toggleDropdown('features')}
-                    className="group flex items-center space-x-1 px-4 py-2 text-sm font-medium text-gray-600 transition-colors duration-200 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
-                  >
-                    <span>Features</span>
-                    <ChevronDown
-                      className={`h-3 w-3 transition-transform duration-200 ${openDropdown === 'features' ? 'rotate-180' : ''}`}
-                    />
-                    <div className="absolute inset-0 -z-10 rounded-lg bg-gradient-to-r from-blue-50 to-purple-50 opacity-0 transition-opacity duration-200 group-hover:opacity-100 dark:from-blue-950/20 dark:to-purple-950/20"></div>
-                  </button>
-
-                  {/* Features Dropdown Content */}
-                  {openDropdown === 'features' && (
-                    <div className="absolute top-full left-0 z-[100] mt-2 w-56 rounded-lg border border-gray-200 bg-white py-2 shadow-lg dark:border-gray-700 dark:bg-gray-800">
-                      {featuresItems.map(item => (
-                        <Link
-                          key={item.label}
-                          href={item.href}
-                          onClick={() => setOpenDropdown(null)}
-                          className="flex w-full items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
-                        >
-                          <item.icon className="mr-3 h-4 w-4 text-blue-500" />
-                          {item.label}
-                        </Link>
-                      ))}
-                    </div>
-                  )}
-                </div>
 
                 {/* Solutions Dropdown */}
                 <div className="relative" ref={solutionsRef}>
@@ -481,46 +441,6 @@ export function Navbar() {
                   >
                     <span className="text-lg font-medium">Record</span>
                   </Link>
-
-                  {/* Features Dropdown */}
-                  <div className="space-y-1">
-                    <button
-                      onClick={() => toggleMobileDropdown('features')}
-                      className="group flex w-full items-center justify-between rounded-lg p-3 text-left text-gray-900 transition-all duration-200 hover:bg-gray-100 dark:text-white dark:hover:bg-gray-800"
-                      data-mobile-menu
-                    >
-                      <span className="text-lg font-medium">Features</span>
-                      <ChevronDown
-                        className={`h-4 w-4 transition-transform duration-200 ${
-                          mobileDropdowns.features ? 'rotate-180' : ''
-                        }`}
-                      />
-                    </button>
-
-                    {/* Features Items */}
-                    <div
-                      className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                        mobileDropdowns.features
-                          ? 'max-h-96 opacity-100'
-                          : 'max-h-0 opacity-0'
-                      }`}
-                    >
-                      <div className="space-y-1 pl-4">
-                        {featuresItems.map((item, index) => (
-                          <Link
-                            key={item.label}
-                            href={item.href}
-                            onClick={() => setIsMobileMenuOpen(false)}
-                            className="group flex w-full items-center rounded-lg p-3 text-left text-gray-700 transition-all duration-200 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
-                            style={{ animationDelay: `${index * 50}ms` }}
-                          >
-                            <item.icon className="mr-3 h-5 w-5 text-blue-500" />
-                            <span className="font-medium">{item.label}</span>
-                          </Link>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
 
                   {/* Solutions Dropdown */}
                   <div className="space-y-1">
