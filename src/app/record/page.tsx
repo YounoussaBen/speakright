@@ -133,7 +133,6 @@ export default function RecordPage() {
             className="flex items-center space-x-2 text-gray-600 transition-colors hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
           >
             <ArrowLeft className="h-4 w-4" />
-            <span>Choose Different Text</span>
           </button>
 
           <div className="flex items-center space-x-3">
