@@ -67,9 +67,9 @@
 
 ### User Account
 
-- **1** Create `/profile` route and page
-- **2** Build account information display
-- **3** Add profile editing functionality
+- ~~**1** Create `/profile` route and page~~
+- ~~**2** Build account information display~~
+- ~~**3** Add profile editing functionality~~
 
 ### Session History
 
