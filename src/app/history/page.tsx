@@ -410,14 +410,6 @@ export default function HistoryPage() {
                       >
                         <Download className="h-4 w-4" />
                       </Button>
-                      <Button
-                        onClick={() => deleteSession(session.id!)}
-                        variant="outline"
-                        size="sm"
-                        className="text-red-600 hover:text-red-700"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
                     </div>
                   </div>
                 </CardContent>

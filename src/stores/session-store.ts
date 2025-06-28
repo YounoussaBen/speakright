@@ -1,5 +1,5 @@
 // src/stores/session-store.ts
-import { db } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { User } from 'firebase/auth';
 import {
   addDoc,
@@ -34,7 +34,7 @@ export interface PronunciationAssessment {
 
 export interface SessionData {
   id?: string;
-  userId?: string;
+  userId?: string | undefined;
   originalText: string;
   transcribedText: string;
   audioUrl?: string;
@@ -86,7 +86,12 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       updatedAt: new Date(),
     };
 
-    if (sessionData.userId) {
+    // ✅ Check if user is authenticated and session has valid userId
+    if (
+      sessionData.userId &&
+      sessionData.userId.trim() !== '' &&
+      auth.currentUser
+    ) {
       // Save to Firestore for authenticated users
       try {
         const docRef = await addDoc(collection(db, 'sessions'), {
@@ -101,7 +106,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         get().saveLocalSession(newSession);
       }
     } else {
-      // Save locally for anonymous users
+      // Save locally for anonymous users or sessions without valid userId
       get().saveLocalSession(newSession);
     }
 
@@ -122,7 +127,13 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     const session = get().sessions.find(s => s.id === sessionId);
     if (!session) return;
 
-    if (session.userId) {
+    // ✅ Check if session belongs to authenticated user
+    if (
+      session.userId &&
+      session.userId.trim() !== '' &&
+      auth.currentUser &&
+      session.userId === auth.currentUser.uid
+    ) {
       // Update in Firestore
       try {
         await updateDoc(doc(db, 'sessions', sessionId), {
@@ -153,30 +164,41 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 
   deleteSession: async sessionId => {
     const session = get().sessions.find(s => s.id === sessionId);
-    if (!session) return;
-
-    if (session.userId) {
-      // Delete from Firestore
-      try {
-        await deleteDoc(doc(db, 'sessions', sessionId));
-      } catch (error) {
-        console.error('Error deleting session from Firestore:', error);
-      }
-    } else {
-      // Delete from local storage
-      const localSessions = get().loadLocalSessions();
-      const updatedSessions = localSessions.filter(s => s.id !== sessionId);
-      localStorage.setItem(
-        'pronunciation_sessions',
-        JSON.stringify(updatedSessions)
-      );
+    if (!session) {
+      console.warn('Session not found:', sessionId);
+      return;
     }
 
-    set(state => ({
-      sessions: state.sessions.filter(s => s.id !== sessionId),
-      currentSession:
-        state.currentSession?.id === sessionId ? null : state.currentSession,
-    }));
+    try {
+      // ✅ Check if this is a Firestore session that belongs to current user
+      if (session.userId && session.userId.trim() !== '' && auth.currentUser) {
+        // Ensure user is authenticated and session belongs to them
+        if (session.userId !== auth.currentUser.uid) {
+          throw new Error('Session does not belong to current user');
+        }
+
+        // Delete from Firestore
+        await deleteDoc(doc(db, 'sessions', sessionId));
+      } else {
+        // Handle local storage deletion for anonymous sessions
+        const localSessions = get().loadLocalSessions();
+        const updatedSessions = localSessions.filter(s => s.id !== sessionId);
+        localStorage.setItem(
+          'pronunciation_sessions',
+          JSON.stringify(updatedSessions)
+        );
+      }
+
+      // ✅ Only update UI on successful deletion
+      set(state => ({
+        sessions: state.sessions.filter(s => s.id !== sessionId),
+        currentSession:
+          state.currentSession?.id === sessionId ? null : state.currentSession,
+      }));
+    } catch (error) {
+      console.error('Failed to delete session:', error);
+      throw error; // Re-throw for UI error handling
+    }
   },
 
   loadUserSessions: async user => {

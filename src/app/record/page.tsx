@@ -259,7 +259,7 @@ export default function RecordPage() {
 
       // Create session data
       const sessionData: Omit<SessionData, 'id' | 'createdAt' | 'updatedAt'> = {
-        userId: user?.uid ?? '',
+        userId: user?.uid,
         originalText: selectedText,
         transcribedText: transcriber.output.text,
         audioUrl: uploadedAudioUrl,
