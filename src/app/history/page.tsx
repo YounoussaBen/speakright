@@ -1,4 +1,4 @@
-// src/app/history/page.tsx
+// src/app/history/page.tsx - Clean version without deletion
 'use client';
 
 import { Button } from '@/components/ui/button';
@@ -14,7 +14,6 @@ import {
   FileText,
   Filter,
   Search,
-  Trash2,
   TrendingUp,
   Users,
 } from 'lucide-react';
@@ -22,16 +21,12 @@ import { useEffect, useState } from 'react';
 
 export default function HistoryPage() {
   const { user } = useAuth();
-  const { sessions, loading, loadUserSessions, deleteSession } =
-    useSessionStore();
+  const { sessions, loading, loadUserSessions } = useSessionStore();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'date' | 'score' | 'duration'>('date');
   const [filterBy, setFilterBy] = useState<'all' | 'high' | 'medium' | 'low'>(
     'all'
-  );
-  const [selectedSessions, setSelectedSessions] = useState<Set<string>>(
-    new Set()
   );
 
   // Load sessions on mount
@@ -72,35 +67,6 @@ export default function HistoryPage() {
           return 0;
       }
     });
-
-  // Handle session selection
-  const toggleSessionSelection = (sessionId: string) => {
-    const newSelection = new Set(selectedSessions);
-    if (newSelection.has(sessionId)) {
-      newSelection.delete(sessionId);
-    } else {
-      newSelection.add(sessionId);
-    }
-    setSelectedSessions(newSelection);
-  };
-
-  const selectAllSessions = () => {
-    if (selectedSessions.size === filteredAndSortedSessions.length) {
-      setSelectedSessions(new Set());
-    } else {
-      setSelectedSessions(new Set(filteredAndSortedSessions.map(s => s.id!)));
-    }
-  };
-
-  // Handle bulk operations
-  const handleBulkDelete = async () => {
-    if (window.confirm(`Delete ${selectedSessions.size} sessions?`)) {
-      for (const sessionId of selectedSessions) {
-        await deleteSession(sessionId);
-      }
-      setSelectedSessions(new Set());
-    }
-  };
 
   const handleDownloadReport = async (session: SessionData) => {
     try {
@@ -290,25 +256,6 @@ export default function HistoryPage() {
                 </select>
               </div>
             </div>
-
-            {/* Bulk Actions */}
-            {selectedSessions.size > 0 && (
-              <div className="mt-4 flex items-center justify-between border-t border-gray-200 pt-4 dark:border-gray-700">
-                <span className="text-sm text-gray-600 dark:text-gray-400">
-                  {selectedSessions.size} session(s) selected
-                </span>
-                <div className="flex space-x-2">
-                  <Button
-                    onClick={handleBulkDelete}
-                    variant="destructive"
-                    size="sm"
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Delete Selected
-                  </Button>
-                </div>
-              </div>
-            )}
           </CardContent>
         </Card>
 
@@ -329,21 +276,6 @@ export default function HistoryPage() {
           </Card>
         ) : (
           <div className="space-y-4">
-            {/* Select All */}
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                checked={
-                  selectedSessions.size === filteredAndSortedSessions.length
-                }
-                onChange={selectAllSessions}
-                className="rounded border-gray-300"
-              />
-              <span className="text-sm text-gray-600 dark:text-gray-400">
-                Select all
-              </span>
-            </div>
-
             {/* Session Cards */}
             {filteredAndSortedSessions.map(session => (
               <Card
@@ -352,63 +284,87 @@ export default function HistoryPage() {
               >
                 <CardContent className="p-6">
                   <div className="flex items-start justify-between">
-                    <div className="flex flex-1 items-start space-x-4">
-                      {/* Checkbox */}
-                      <input
-                        type="checkbox"
-                        checked={selectedSessions.has(session.id!)}
-                        onChange={() => toggleSessionSelection(session.id!)}
-                        className="mt-1 rounded border-gray-300"
-                      />
-
+                    <div className="flex-1">
                       {/* Session Info */}
-                      <div className="min-w-0 flex-1">
-                        <div className="mb-2 flex items-center space-x-3">
+                      <div className="mb-2 flex items-center space-x-3">
+                        <div
+                          className={`rounded-full px-2 py-1 text-xs font-medium ${getScoreBadgeColor(session.assessment.overallScore)}`}
+                        >
+                          {session.assessment.overallScore}%
+                        </div>
+                        <div className="flex items-center space-x-1 text-sm text-gray-500 dark:text-gray-400">
+                          <CalendarDays className="h-4 w-4" />
+                          <span>{session.createdAt.toLocaleDateString()}</span>
+                        </div>
+                        <div className="flex items-center space-x-1 text-sm text-gray-500 dark:text-gray-400">
+                          <Clock className="h-4 w-4" />
+                          <span>
+                            {formatDuration(session.metadata.duration)}
+                          </span>
+                        </div>
+                        <div className="flex items-center space-x-1 text-sm text-gray-500 dark:text-gray-400">
+                          <FileText className="h-4 w-4" />
+                          <span>{session.metadata.wordCount} words</span>
+                        </div>
+                      </div>
+
+                      <p className="mb-2 line-clamp-2 text-gray-900 dark:text-white">
+                        {session.originalText.length > 150
+                          ? session.originalText.substring(0, 150) + '...'
+                          : session.originalText}
+                      </p>
+
+                      {session.metadata.sourceFileName && (
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          Source: {session.metadata.sourceFileName}
+                        </p>
+                      )}
+
+                      {/* Assessment Details */}
+                      <div className="mt-3 grid grid-cols-3 gap-4 rounded-lg bg-gray-50/50 p-3 dark:bg-gray-800/50">
+                        <div className="text-center">
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            Accuracy
+                          </div>
                           <div
-                            className={`rounded-full px-2 py-1 text-xs font-medium ${getScoreBadgeColor(session.assessment.overallScore)}`}
+                            className={`font-semibold ${getScoreColor(session.assessment.accuracyScore)}`}
+                          >
+                            {session.assessment.accuracyScore}%
+                          </div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            Fluency
+                          </div>
+                          <div
+                            className={`font-semibold ${getScoreColor(session.assessment.fluencyScore)}`}
+                          >
+                            {session.assessment.fluencyScore}%
+                          </div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            Overall
+                          </div>
+                          <div
+                            className={`font-semibold ${getScoreColor(session.assessment.overallScore)}`}
                           >
                             {session.assessment.overallScore}%
                           </div>
-                          <div className="flex items-center space-x-1 text-sm text-gray-500 dark:text-gray-400">
-                            <CalendarDays className="h-4 w-4" />
-                            <span>
-                              {session.createdAt.toLocaleDateString()}
-                            </span>
-                          </div>
-                          <div className="flex items-center space-x-1 text-sm text-gray-500 dark:text-gray-400">
-                            <Clock className="h-4 w-4" />
-                            <span>
-                              {formatDuration(session.metadata.duration)}
-                            </span>
-                          </div>
-                          <div className="flex items-center space-x-1 text-sm text-gray-500 dark:text-gray-400">
-                            <FileText className="h-4 w-4" />
-                            <span>{session.metadata.wordCount} words</span>
-                          </div>
                         </div>
-
-                        <p className="mb-2 line-clamp-2 text-gray-900 dark:text-white">
-                          {session.originalText.length > 150
-                            ? session.originalText.substring(0, 150) + '...'
-                            : session.originalText}
-                        </p>
-
-                        {session.metadata.sourceFileName && (
-                          <p className="text-sm text-gray-500 dark:text-gray-400">
-                            Source: {session.metadata.sourceFileName}
-                          </p>
-                        )}
                       </div>
                     </div>
 
                     {/* Actions */}
-                    <div className="ml-4 flex items-center space-x-2">
+                    <div className="ml-4 flex items-center">
                       <Button
                         onClick={() => handleDownloadReport(session)}
                         variant="outline"
                         size="sm"
+                        className="flex items-center space-x-2"
                       >
                         <Download className="h-4 w-4" />
+                        <span>Export</span>
                       </Button>
                     </div>
                   </div>
