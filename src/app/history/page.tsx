@@ -12,7 +12,6 @@ import {
   Clock,
   Download,
   FileText,
-  Filter,
   Search,
   TrendingUp,
   Users,
@@ -226,7 +225,6 @@ export default function HistoryPage() {
               {/* Filters */}
               <div className="flex items-center space-x-4">
                 <div className="flex items-center space-x-2">
-                  <Filter className="h-4 w-4 text-gray-500" />
                   <select
                     value={filterBy}
                     onChange={e =>
@@ -364,7 +362,6 @@ export default function HistoryPage() {
                         className="flex items-center space-x-2"
                       >
                         <Download className="h-4 w-4" />
-                        <span>Export</span>
                       </Button>
                     </div>
                   </div>
