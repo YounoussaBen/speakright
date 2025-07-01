@@ -5,11 +5,13 @@ import { useTranscriber } from '@/hooks/useTranscriber';
 import { PronunciationAssessmentEngine } from '@/lib/assessment-engine';
 import { useAuth } from '@/lib/auth-context';
 import { PDFReportGenerator } from '@/lib/pdf-report-generator';
+import { ReportPreview } from '@/lib/report-preview';
 import { SessionData, useSessionStore } from '@/stores/session-store';
 import {
   ArrowLeft,
   Award,
   Download,
+  Eye,
   FileText,
   Mic,
   Play,
@@ -31,6 +33,7 @@ export default function RecordPage() {
   const [audioLevel, setAudioLevel] = useState(0);
   const [recordingTime, setRecordingTime] = useState(0);
   const [uploadedAudioUrl, setUploadedAudioUrl] = useState('');
+  const [showReportPreview, setShowReportPreview] = useState(false);
   interface Assessment {
     overallScore: number;
     accuracyScore: number;
@@ -316,6 +319,10 @@ export default function RecordPage() {
     router.push('/');
   };
 
+  const handlePreviewReport = () => {
+    setShowReportPreview(true);
+  };
+
   const handleDownloadReport = async () => {
     if (currentSession) {
       try {
@@ -366,6 +373,15 @@ export default function RecordPage() {
             <ArrowLeft className="h-4 w-4" />
             <span>New Text</span>
           </button>
+          {recordingState === 'assessed' && currentSession && (
+            <button
+              onClick={handlePreviewReport}
+              className="flex items-center space-x-2 rounded-xl bg-purple-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-all hover:bg-purple-700 hover:shadow-md"
+            >
+              <Eye className="h-4 w-4" />
+              <span>Preview Report</span>
+            </button>
+          )}
 
           <div className="flex items-center space-x-3">
             {recordingState === 'assessed' && currentSession && (
@@ -771,6 +787,18 @@ export default function RecordPage() {
             )}
           </div>
         </div>
+        {/* Add Report Preview Component */}
+        {recordingState === 'assessed' && currentSession && (
+          <ReportPreview
+            session={currentSession}
+            isOpen={showReportPreview}
+            onClose={() => setShowReportPreview(false)}
+            onDownload={() => {
+              setShowReportPreview(false);
+              // Optionally show a success message
+            }}
+          />
+        )}
       </div>
     </div>
   );
