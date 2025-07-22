@@ -268,6 +268,25 @@ export function Navbar() {
                   <div className="absolute inset-0 -z-10 rounded-lg bg-gradient-to-r from-blue-50 to-purple-50 opacity-0 transition-opacity duration-200 group-hover:opacity-100 dark:from-blue-950/20 dark:to-purple-950/20"></div>
                 </Link>
 
+                {/* Quiz Button - Only visible for logged-in users */}
+                {user && (
+                  <Link
+                    href="/quiz"
+                    onClick={() => setActiveLink('quiz')}
+                    className="group relative px-4 py-2 text-sm font-medium text-gray-600 transition-colors duration-200 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
+                  >
+                    Quiz
+                    <div
+                      className={`absolute bottom-0 left-1/2 h-0.5 -translate-x-1/2 transform rounded-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-300 ${
+                        activeLink === 'quiz'
+                          ? 'w-full opacity-100'
+                          : 'w-0 opacity-0 group-hover:w-full group-hover:opacity-100'
+                      }`}
+                    ></div>
+                    <div className="absolute inset-0 -z-10 rounded-lg bg-gradient-to-r from-blue-50 to-purple-50 opacity-0 transition-opacity duration-200 group-hover:opacity-100 dark:from-blue-950/20 dark:to-purple-950/20"></div>
+                  </Link>
+                )}
+
                 {/* Pricing Button */}
                 <Link
                   href="/pricing"
@@ -443,6 +462,20 @@ export function Navbar() {
                   >
                     <span className="text-lg font-medium">Record</span>
                   </Link>
+
+                  {/* Quiz - Only visible for logged-in users */}
+                  {user && (
+                    <Link
+                      href="/quiz"
+                      onClick={() => {
+                        setActiveLink('quiz');
+                        setIsMobileMenuOpen(false);
+                      }}
+                      className="group flex w-full items-center rounded-lg p-3 text-left text-gray-900 transition-all duration-200 hover:bg-gray-100 dark:text-white dark:hover:bg-gray-800"
+                    >
+                      <span className="text-lg font-medium">Quiz</span>
+                    </Link>
+                  )}
 
                   {/* Pricing */}
                   <Link
