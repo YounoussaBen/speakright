@@ -31,7 +31,12 @@ export class PDFReportGenerator {
     await this.addCoverPage(pdfDoc, session);
     await this.addSummaryPage(pdfDoc, session);
 
-    if (includeWordBreakdown) {
+    // Only include word breakdown for text-based sessions
+    if (
+      includeWordBreakdown &&
+      session.sessionType === 'text-based' &&
+      'wordLevelScores' in session.assessment
+    ) {
       await this.addWordBreakdownPage(pdfDoc, session);
     }
 
@@ -182,12 +187,38 @@ export class PDFReportGenerator {
       color: primaryBlue,
     });
 
-    // Scores section
-    const scores = [
-      { label: 'Overall Score', value: session.assessment.overallScore },
-      { label: 'Accuracy Score', value: session.assessment.accuracyScore },
-      { label: 'Fluency Score', value: session.assessment.fluencyScore },
-    ];
+    // Scores section - conditional based on session type
+    const scores =
+      session.sessionType === 'text-based'
+        ? [
+            { label: 'Overall Score', value: session.assessment.overallScore },
+            {
+              label: 'Accuracy Score',
+              value:
+                'accuracyScore' in session.assessment
+                  ? session.assessment.accuracyScore
+                  : 0,
+            },
+            { label: 'Fluency Score', value: session.assessment.fluencyScore },
+          ]
+        : [
+            { label: 'Overall Score', value: session.assessment.overallScore },
+            { label: 'Fluency Score', value: session.assessment.fluencyScore },
+            {
+              label: 'Clarity Score',
+              value:
+                'clarityScore' in session.assessment
+                  ? session.assessment.clarityScore
+                  : 0,
+            },
+            {
+              label: 'Grammar Score',
+              value:
+                'grammarScore' in session.assessment
+                  ? session.assessment.grammarScore
+                  : 0,
+            },
+          ];
 
     scores.forEach((score, index) => {
       const yPos = height - 120 - index * 80;
@@ -231,29 +262,34 @@ export class PDFReportGenerator {
       });
     });
 
-    // Original text section
-    page.drawText('Original Text:', {
-      x: 50,
-      y: height - 400,
-      size: 14,
-      color: darkGray,
-    });
-
-    // Wrap text
-    const originalText = session.originalText;
-    const wrappedOriginal = this.wrapText(originalText, 65);
-
-    wrappedOriginal.forEach((line, index) => {
-      page.drawText(line, {
+    // Original text section - only for text-based sessions
+    let transcribedStartY;
+    if (session.sessionType === 'text-based' && session.originalText) {
+      page.drawText('Original Text:', {
         x: 50,
-        y: height - 430 - index * 15,
-        size: 10,
-        color: lightGray,
+        y: height - 400,
+        size: 14,
+        color: darkGray,
       });
-    });
 
-    // Transcribed text section
-    const transcribedStartY = height - 430 - wrappedOriginal.length * 15 - 30;
+      // Wrap text
+      const originalText = session.originalText;
+      const wrappedOriginal = this.wrapText(originalText, 65);
+
+      wrappedOriginal.forEach((line, index) => {
+        page.drawText(line, {
+          x: 50,
+          y: height - 430 - index * 15,
+          size: 10,
+          color: lightGray,
+        });
+      });
+
+      transcribedStartY = height - 430 - wrappedOriginal.length * 15 - 30;
+    } else {
+      // For free speech, start transcription higher
+      transcribedStartY = height - 400;
+    }
 
     page.drawText('Transcribed Text:', {
       x: 50,
@@ -282,6 +318,11 @@ export class PDFReportGenerator {
     pdfDoc: PDFDocument,
     session: SessionData
   ) {
+    // Type guard: This method should only be called for text-based sessions
+    if (!('wordLevelScores' in session.assessment)) {
+      return;
+    }
+
     const page = pdfDoc.addPage(PageSizes.A4);
     const { width, height } = page.getSize();
 
@@ -319,7 +360,7 @@ export class PDFReportGenerator {
       color: lightGray,
     });
 
-    // Word data
+    // Word data - now TypeScript knows wordLevelScores exists
     const wordData = session.assessment.wordLevelScores.slice(0, 20); // Limit to prevent overflow
 
     wordData.forEach((word, index) => {
@@ -554,8 +595,8 @@ export class PDFReportGenerator {
     try {
       const pdfBytes = await this.generateReport(session, options);
 
-      // Create blob and download
-      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+      // Create blob and download - convert to buffer for compatibility
+      const blob = new Blob([pdfBytes.buffer], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
 
       // Create download link

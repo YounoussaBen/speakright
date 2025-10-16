@@ -41,6 +41,7 @@ const transcribe = async audio => {
   let options = {
     chunk_length_s: 30, // adjust chunk size in seconds as needed
     stride_length_s: 5, // adjust overlap between chunks as needed
+    return_timestamps: 'word', // Get word-level timestamps
   };
 
   let output = await transcriber(audio, options).catch(error => {
@@ -52,5 +53,23 @@ const transcribe = async audio => {
     return null;
   });
 
-  return output;
+  // Process output to extract chunks with timestamps
+  if (output && output.chunks) {
+    return {
+      text: output.text,
+      chunks: output.chunks.map(chunk => ({
+        text: chunk.text,
+        timestamp: chunk.timestamp,
+        // Note: Whisper doesn't provide confidence scores directly
+        // We'll use a default high confidence
+        confidence: 0.85,
+      })),
+    };
+  }
+
+  // Fallback if chunks are not available
+  return {
+    text: output?.text || '',
+    chunks: undefined,
+  };
 };

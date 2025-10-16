@@ -14,9 +14,11 @@ import {
   CheckCircle,
   FileText,
   Loader2,
+  MessageSquare,
   RefreshCw,
   Upload,
   X,
+  Zap,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
@@ -150,6 +152,11 @@ export function HeroSection() {
     setSelectedText('');
   };
 
+  const handleFreeSpeech = () => {
+    sessionStorage.setItem('practiceMode', 'free-speech');
+    router.push('/record?mode=free-speech');
+  };
+
   if (isLoading) {
     return (
       <section className="relative flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 px-6 py-16 pt-20 dark:from-gray-900 dark:to-gray-800">
@@ -185,7 +192,7 @@ export function HeroSection() {
 
       <div className="relative mx-auto w-full max-w-6xl">
         {/* Hero Text */}
-        <div className="mb-12 text-center">
+        <div className="mb-8 text-center">
           <h1 className="text-4xl leading-tight font-bold text-gray-900 lg:text-6xl dark:text-white">
             Perfect Your{' '}
             <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
@@ -196,6 +203,64 @@ export function HeroSection() {
           <p className="mt-4 text-lg leading-relaxed text-gray-600 lg:text-xl dark:text-gray-300">
             Improve your speaking skills with personalized feedback
           </p>
+        </div>
+
+        {/* Free Speech CTA Banner */}
+        <div className="mb-8">
+          <div className="relative overflow-hidden rounded-3xl border border-white/20 bg-gradient-to-r from-green-50/80 via-blue-50/80 to-purple-50/80 p-6 backdrop-blur-sm dark:border-gray-700/30 dark:from-green-950/20 dark:via-blue-950/20 dark:to-purple-950/20">
+            {/* Animated Background */}
+            <div className="absolute inset-0 opacity-20">
+              <div className="absolute top-0 right-0 h-32 w-32 animate-pulse rounded-full bg-green-400 blur-3xl"></div>
+              <div
+                className="absolute bottom-0 left-0 h-32 w-32 animate-pulse rounded-full bg-blue-400 blur-3xl"
+                style={{ animationDelay: '1s' }}
+              ></div>
+            </div>
+
+            <div className="relative flex flex-col items-center justify-between gap-4 md:flex-row">
+              {/* Left Content */}
+              <div className="flex items-center space-x-4">
+                <div className="flex-shrink-0 rounded-2xl bg-gradient-to-br from-green-500 to-blue-500 p-3 shadow-lg">
+                  <MessageSquare className="h-8 w-8 text-white" />
+                </div>
+                <div className="text-center md:text-left">
+                  <div className="mb-1 flex items-center justify-center gap-2 md:justify-start">
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                      Try Free Speech Practice
+                    </h3>
+                    <span className="rounded-full bg-green-500 px-2 py-0.5 text-xs font-bold text-white shadow-sm">
+                      NEW
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-600 dark:text-gray-300">
+                    Speak naturally. Get instant AI feedback on fluency, clarity
+                    & grammar.
+                  </p>
+                </div>
+              </div>
+
+              {/* Right Button */}
+              <button
+                onClick={handleFreeSpeech}
+                className="group/btn flex-shrink-0 rounded-xl bg-gradient-to-r from-green-600 to-blue-600 px-6 py-3 text-base font-semibold text-white shadow-lg transition-all duration-300 hover:from-green-700 hover:to-blue-700 hover:shadow-xl"
+              >
+                <div className="flex items-center space-x-2">
+                  <Zap className="h-5 w-5" />
+                  <span>Start Now</span>
+                  <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover/btn:translate-x-1" />
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Divider */}
+        <div className="mb-8 flex items-center justify-center">
+          <div className="h-px flex-1 bg-gradient-to-r from-transparent via-gray-300 to-transparent dark:via-gray-600"></div>
+          <span className="mx-4 text-sm font-medium text-gray-500 dark:text-gray-400">
+            or choose text-based practice
+          </span>
+          <div className="h-px flex-1 bg-gradient-to-r from-transparent via-gray-300 to-transparent dark:via-gray-600"></div>
         </div>
 
         {/* Main Content Grid */}

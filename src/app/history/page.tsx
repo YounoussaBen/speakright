@@ -320,36 +320,82 @@ export default function HistoryPage() {
 
                       {/* Assessment Details */}
                       <div className="mt-3 grid grid-cols-3 gap-4 rounded-lg bg-gray-50/50 p-3 dark:bg-gray-800/50">
-                        <div className="text-center">
-                          <div className="text-xs text-gray-500 dark:text-gray-400">
-                            Accuracy
-                          </div>
-                          <div
-                            className={`font-semibold ${getScoreColor(session.assessment.accuracyScore)}`}
-                          >
-                            {session.assessment.accuracyScore}%
-                          </div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-xs text-gray-500 dark:text-gray-400">
-                            Fluency
-                          </div>
-                          <div
-                            className={`font-semibold ${getScoreColor(session.assessment.fluencyScore)}`}
-                          >
-                            {session.assessment.fluencyScore}%
-                          </div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-xs text-gray-500 dark:text-gray-400">
-                            Overall
-                          </div>
-                          <div
-                            className={`font-semibold ${getScoreColor(session.assessment.overallScore)}`}
-                          >
-                            {session.assessment.overallScore}%
-                          </div>
-                        </div>
+                        {session.sessionType === 'text-based' ? (
+                          <>
+                            <div className="text-center">
+                              <div className="text-xs text-gray-500 dark:text-gray-400">
+                                Accuracy
+                              </div>
+                              <div
+                                className={`font-semibold ${getScoreColor('accuracyScore' in session.assessment ? session.assessment.accuracyScore : 0)}`}
+                              >
+                                {'accuracyScore' in session.assessment
+                                  ? session.assessment.accuracyScore
+                                  : 0}
+                                %
+                              </div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-xs text-gray-500 dark:text-gray-400">
+                                Fluency
+                              </div>
+                              <div
+                                className={`font-semibold ${getScoreColor(session.assessment.fluencyScore)}`}
+                              >
+                                {session.assessment.fluencyScore}%
+                              </div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-xs text-gray-500 dark:text-gray-400">
+                                Overall
+                              </div>
+                              <div
+                                className={`font-semibold ${getScoreColor(session.assessment.overallScore)}`}
+                              >
+                                {session.assessment.overallScore}%
+                              </div>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="text-center">
+                              <div className="text-xs text-gray-500 dark:text-gray-400">
+                                Fluency
+                              </div>
+                              <div
+                                className={`font-semibold ${getScoreColor(session.assessment.fluencyScore)}`}
+                              >
+                                {session.assessment.fluencyScore}%
+                              </div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-xs text-gray-500 dark:text-gray-400">
+                                Clarity
+                              </div>
+                              <div
+                                className={`font-semibold ${getScoreColor('clarityScore' in session.assessment ? session.assessment.clarityScore : 0)}`}
+                              >
+                                {'clarityScore' in session.assessment
+                                  ? session.assessment.clarityScore
+                                  : 0}
+                                %
+                              </div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-xs text-gray-500 dark:text-gray-400">
+                                Grammar
+                              </div>
+                              <div
+                                className={`font-semibold ${getScoreColor('grammarScore' in session.assessment ? session.assessment.grammarScore : 0)}`}
+                              >
+                                {'grammarScore' in session.assessment
+                                  ? session.assessment.grammarScore
+                                  : 0}
+                                %
+                              </div>
+                            </div>
+                          </>
+                        )}
                       </div>
                     </div>
 

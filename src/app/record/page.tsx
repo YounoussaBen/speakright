@@ -3,6 +3,7 @@
 
 import { useTranscriber } from '@/hooks/useTranscriber';
 import { PronunciationAssessmentEngine } from '@/lib/assessment-engine';
+import { FreeSpeechAssessmentEngine } from '@/lib/free-speech-assessment';
 import { useAuth } from '@/lib/auth-context';
 import { PDFReportGenerator } from '@/lib/pdf-report-generator';
 import { ReportPreview } from '@/lib/report-preview';
@@ -23,6 +24,9 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 export default function RecordPage() {
+  const [practiceMode, setPracticeMode] = useState<
+    'text-based' | 'free-speech'
+  >('text-based');
   const [selectedText, setSelectedText] = useState('');
   const [uploadedFileName, setUploadedFileName] = useState('');
   const [isUploadedFile, setIsUploadedFile] = useState(false);
@@ -34,10 +38,16 @@ export default function RecordPage() {
   const [recordingTime, setRecordingTime] = useState(0);
   const [uploadedAudioUrl, setUploadedAudioUrl] = useState('');
   const [showReportPreview, setShowReportPreview] = useState(false);
+  const [audioBufferRef, setAudioBufferRef] = useState<AudioBuffer | null>(
+    null
+  );
   interface Assessment {
     overallScore: number;
-    accuracyScore: number;
+    accuracyScore?: number;
     fluencyScore: number;
+    clarityScore?: number;
+    grammarScore?: number;
+    pronunciationScore?: number;
     suggestions: string[];
     // Add other fields as needed based on PronunciationAssessmentEngine.assessPronunciation output
   }
@@ -66,6 +76,15 @@ export default function RecordPage() {
   useEffect(() => {
     const storedText = sessionStorage.getItem('selectedText');
     const storedFileName = sessionStorage.getItem('uploadedFileName');
+    const storedMode = sessionStorage.getItem('practiceMode') as
+      | 'text-based'
+      | 'free-speech'
+      | null;
+
+    // Set practice mode if stored
+    if (storedMode) {
+      setPracticeMode(storedMode);
+    }
 
     if (storedText) {
       setSelectedText(storedText);
@@ -81,8 +100,16 @@ export default function RecordPage() {
       setIsUploadedFile(false);
     }
 
-    if (!storedText && !storedFileName) {
-      router.push('/');
+    // Only redirect if not in free speech mode and no text provided
+    if (!storedText && !storedFileName && storedMode !== 'free-speech') {
+      // Allow access if coming from home with free-speech mode
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('mode') === 'free-speech') {
+        setPracticeMode('free-speech');
+        sessionStorage.setItem('practiceMode', 'free-speech');
+      } else if (!storedMode) {
+        router.push('/');
+      }
     }
   }, [router]);
 
@@ -209,6 +236,9 @@ export default function RecordPage() {
       const audioContext = new AudioContext({ sampleRate: 16000 });
       const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
 
+      // Store audio buffer for free speech assessment
+      setAudioBufferRef(audioBuffer);
+
       await transcriber.start(audioBuffer);
     } catch (error) {
       console.error('Error processing audio:', error);
@@ -245,46 +275,79 @@ export default function RecordPage() {
 
   // Listen to transcriber state changes and perform assessment
   useEffect(() => {
-    if (transcriber.output?.text && recordingState === 'processing') {
-      setFinalTranscript(transcriber.output.text);
+    if (
+      transcriber.output?.text &&
+      recordingState === 'processing' &&
+      audioBufferRef
+    ) {
+      const transcriptionOutput = transcriber.output; // Store to avoid undefined issues in async function
+      setFinalTranscript(transcriptionOutput.text);
       setRecordingState('completed');
 
-      // Perform pronunciation assessment
       const actualDuration = recordingTime || 0;
-      const pronunciationAssessment =
-        PronunciationAssessmentEngine.assessPronunciation(
-          selectedText,
-          transcriber.output.text,
-          actualDuration
-        );
 
-      setAssessment(pronunciationAssessment);
+      // Perform assessment based on practice mode
+      const performAssessment = async () => {
+        let assessmentResult;
 
-      // Create session data
-      const sessionData: Omit<SessionData, 'id' | 'createdAt' | 'updatedAt'> = {
-        userId: user?.uid,
-        originalText: selectedText,
-        transcribedText: transcriber.output.text,
-        audioUrl: uploadedAudioUrl,
-        assessment: pronunciationAssessment,
-        metadata: {
-          duration: actualDuration,
-          wordCount: words.length,
-          sourceType: isUploadedFile ? 'file' : 'sample',
-          ...(uploadedFileName ? { sourceFileName: uploadedFileName } : {}),
-        },
+        if (practiceMode === 'free-speech') {
+          // Free speech assessment
+          assessmentResult = await FreeSpeechAssessmentEngine.assess(
+            transcriptionOutput.text,
+            transcriptionOutput.chunks,
+            audioBufferRef,
+            actualDuration
+          );
+        } else {
+          // Text-based pronunciation assessment
+          assessmentResult = PronunciationAssessmentEngine.assessPronunciation(
+            selectedText,
+            transcriptionOutput.text,
+            actualDuration
+          );
+        }
+
+        setAssessment(assessmentResult);
+
+        // Create session data
+        const sessionData: Omit<SessionData, 'id' | 'createdAt' | 'updatedAt'> =
+          {
+            userId: user?.uid,
+            sessionType: practiceMode,
+            originalText: practiceMode === 'free-speech' ? '' : selectedText,
+            transcribedText: transcriptionOutput.text,
+            audioUrl: uploadedAudioUrl,
+            assessment: assessmentResult,
+            metadata: {
+              duration: actualDuration,
+              wordCount:
+                practiceMode === 'free-speech'
+                  ? transcriptionOutput.text.split(' ').filter(w => w.trim())
+                      .length
+                  : words.length,
+              sourceType:
+                practiceMode === 'free-speech'
+                  ? 'free-speech'
+                  : isUploadedFile
+                    ? 'file'
+                    : 'sample',
+              ...(uploadedFileName ? { sourceFileName: uploadedFileName } : {}),
+            },
+          };
+
+        // Save session
+        createSession(sessionData)
+          .then(session => {
+            setCurrentSession(session);
+            setRecordingState('assessed');
+          })
+          .catch(error => {
+            console.error('Error saving session:', error);
+            setRecordingState('assessed'); // Continue anyway
+          });
       };
 
-      // Save session
-      createSession(sessionData)
-        .then(session => {
-          setCurrentSession(session);
-          setRecordingState('assessed');
-        })
-        .catch(error => {
-          console.error('Error saving session:', error);
-          setRecordingState('assessed'); // Continue anyway
-        });
+      performAssessment();
     }
   }, [
     transcriber.output,
@@ -297,6 +360,8 @@ export default function RecordPage() {
     uploadedFileName,
     uploadedAudioUrl,
     createSession,
+    practiceMode,
+    audioBufferRef,
   ]);
 
   const handleRestart = () => {
@@ -340,7 +405,8 @@ export default function RecordPage() {
     return 'text-red-600';
   };
 
-  if (!selectedText) {
+  // Show loading only if we're in text-based mode and no text is available
+  if (practiceMode === 'text-based' && !selectedText) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 pt-20 dark:from-gray-900 dark:to-gray-800">
         <div className="text-center">
@@ -365,41 +431,84 @@ export default function RecordPage() {
         />
 
         {/* Header */}
-        <div className="mb-8 flex items-center justify-between">
-          <button
-            onClick={handleNewText}
-            className="flex items-center space-x-2 text-gray-600 transition-colors hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            <span>New Text</span>
-          </button>
-          {recordingState === 'assessed' && currentSession && (
-            <button
-              onClick={handlePreviewReport}
-              className="flex items-center space-x-2 rounded-xl bg-purple-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-all hover:bg-purple-700 hover:shadow-md"
-            >
-              <Eye className="h-4 w-4" />
-              <span>Preview Report</span>
-            </button>
-          )}
+        <div className="mb-8 space-y-4">
+          {/* Mode Toggle */}
+          <div className="flex items-center justify-center">
+            <div className="inline-flex rounded-2xl border border-white/20 bg-white/60 p-1 backdrop-blur-sm dark:border-gray-700/30 dark:bg-gray-800/60">
+              <button
+                onClick={() => {
+                  if (recordingState === 'idle') {
+                    setPracticeMode('text-based');
+                    sessionStorage.setItem('practiceMode', 'text-based');
+                  }
+                }}
+                disabled={recordingState !== 'idle'}
+                className={`rounded-xl px-6 py-2 text-sm font-medium transition-all ${
+                  practiceMode === 'text-based'
+                    ? 'bg-blue-600 text-white shadow-md'
+                    : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
+                } disabled:cursor-not-allowed disabled:opacity-50`}
+              >
+                Practice with Text
+              </button>
+              <button
+                onClick={() => {
+                  if (recordingState === 'idle') {
+                    setPracticeMode('free-speech');
+                    sessionStorage.setItem('practiceMode', 'free-speech');
+                  }
+                }}
+                disabled={recordingState !== 'idle'}
+                className={`rounded-xl px-6 py-2 text-sm font-medium transition-all ${
+                  practiceMode === 'free-speech'
+                    ? 'bg-green-600 text-white shadow-md'
+                    : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
+                } disabled:cursor-not-allowed disabled:opacity-50`}
+              >
+                Free Speech
+              </button>
+            </div>
+          </div>
 
-          <div className="flex items-center space-x-3">
+          {/* Action Buttons */}
+          <div className="flex items-center justify-between">
+            <button
+              onClick={handleNewText}
+              className="flex items-center space-x-2 text-gray-600 transition-colors hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span>
+                {practiceMode === 'free-speech' ? 'Back to Home' : 'New Text'}
+              </span>
+            </button>
             {recordingState === 'assessed' && currentSession && (
               <button
-                onClick={handleDownloadReport}
-                className="flex items-center space-x-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-all hover:bg-blue-700 hover:shadow-md"
+                onClick={handlePreviewReport}
+                className="flex items-center space-x-2 rounded-xl bg-purple-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-all hover:bg-purple-700 hover:shadow-md"
               >
-                <Download className="h-4 w-4" />
-                <span>Download Report</span>
+                <Eye className="h-4 w-4" />
+                <span>Preview Report</span>
               </button>
             )}
-            <button
-              onClick={handleRestart}
-              className="flex items-center space-x-2 rounded-xl bg-gray-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-all hover:bg-gray-700 hover:shadow-md"
-            >
-              <RotateCcw className="h-4 w-4" />
-              <span>Restart</span>
-            </button>
+
+            <div className="flex items-center space-x-3">
+              {recordingState === 'assessed' && currentSession && (
+                <button
+                  onClick={handleDownloadReport}
+                  className="flex items-center space-x-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-all hover:bg-blue-700 hover:shadow-md"
+                >
+                  <Download className="h-4 w-4" />
+                  <span>Download Report</span>
+                </button>
+              )}
+              <button
+                onClick={handleRestart}
+                className="flex items-center space-x-2 rounded-xl bg-gray-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-all hover:bg-gray-700 hover:shadow-md"
+              >
+                <RotateCcw className="h-4 w-4" />
+                <span>Restart</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -407,47 +516,89 @@ export default function RecordPage() {
         <div className="grid gap-8 lg:grid-cols-3">
           {/* Left Column - Text Display & Results */}
           <div className="space-y-6 lg:col-span-2">
-            {/* Text Preview */}
-            <div className="rounded-3xl border border-white/20 bg-gradient-to-br from-blue-50/50 to-purple-50/50 p-6 backdrop-blur-sm dark:border-gray-700/30 dark:from-blue-950/10 dark:to-purple-950/10">
-              <div className="mb-4 border-b border-gray-100/50 pb-4 dark:border-gray-700/30">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="rounded-lg bg-blue-100/80 p-2 dark:bg-blue-900/30">
-                      <FileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            {/* Text Preview - Only show in text-based mode */}
+            {practiceMode === 'text-based' && (
+              <div className="rounded-3xl border border-white/20 bg-gradient-to-br from-blue-50/50 to-purple-50/50 p-6 backdrop-blur-sm dark:border-gray-700/30 dark:from-blue-950/10 dark:to-purple-950/10">
+                <div className="mb-4 border-b border-gray-100/50 pb-4 dark:border-gray-700/30">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="rounded-lg bg-blue-100/80 p-2 dark:bg-blue-900/30">
+                        <FileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-gray-900 dark:text-white">
+                          {isUploadedFile ? uploadedFileName : 'Selected Text'}
+                        </h3>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          {words.length} words • ~
+                          {Math.ceil(words.length / 180)} min read
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="font-semibold text-gray-900 dark:text-white">
-                        {isUploadedFile ? uploadedFileName : 'Selected Text'}
-                      </h3>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
-                        {words.length} words • ~{Math.ceil(words.length / 180)}{' '}
-                        min read
-                      </p>
-                    </div>
+                    {isUploadedFile && (
+                      <div className="rounded-full bg-green-100/80 px-3 py-1 dark:bg-green-900/30">
+                        <span className="text-xs font-medium text-green-700 dark:text-green-300">
+                          Extracted Content
+                        </span>
+                      </div>
+                    )}
                   </div>
-                  {isUploadedFile && (
-                    <div className="rounded-full bg-green-100/80 px-3 py-1 dark:bg-green-900/30">
-                      <span className="text-xs font-medium text-green-700 dark:text-green-300">
-                        Extracted Content
+                </div>
+
+                <div className="max-h-80 overflow-y-auto">
+                  <div className="space-y-1 text-lg leading-relaxed">
+                    {words.map((word, index) => (
+                      <span
+                        key={index}
+                        className="mr-2 inline-block text-gray-700 dark:text-gray-300"
+                      >
+                        {word}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Free Speech Instructions - Only show in free-speech mode before recording */}
+            {practiceMode === 'free-speech' && recordingState === 'idle' && (
+              <div className="rounded-3xl border border-white/20 bg-gradient-to-br from-green-50/50 to-blue-50/50 p-8 backdrop-blur-sm dark:border-gray-700/30 dark:from-green-950/10 dark:to-blue-950/10">
+                <div className="text-center">
+                  <h2 className="mb-4 text-2xl font-bold text-gray-900 dark:text-white">
+                    Free Speech Practice
+                  </h2>
+                  <p className="mb-6 text-lg text-gray-700 dark:text-gray-300">
+                    Click the microphone button and start speaking naturally.
+                    Our AI will analyze your fluency, clarity, grammar, and
+                    pronunciation.
+                  </p>
+                  <div className="mx-auto max-w-md space-y-3 text-left text-sm text-gray-600 dark:text-gray-400">
+                    <div className="flex items-start space-x-2">
+                      <span className="mt-1 text-green-600">✓</span>
+                      <span>
+                        Speak about any topic you&apos;re comfortable with
                       </span>
                     </div>
-                  )}
+                    <div className="flex items-start space-x-2">
+                      <span className="mt-1 text-green-600">✓</span>
+                      <span>
+                        Speak for at least 30 seconds for best results
+                      </span>
+                    </div>
+                    <div className="flex items-start space-x-2">
+                      <span className="mt-1 text-green-600">✓</span>
+                      <span>
+                        Be in a quiet environment for accurate analysis
+                      </span>
+                    </div>
+                    <div className="flex items-start space-x-2">
+                      <span className="mt-1 text-green-600">✓</span>
+                      <span>Try to speak in complete sentences</span>
+                    </div>
+                  </div>
                 </div>
               </div>
-
-              <div className="max-h-80 overflow-y-auto">
-                <div className="space-y-1 text-lg leading-relaxed">
-                  {words.map((word, index) => (
-                    <span
-                      key={index}
-                      className="mr-2 inline-block text-gray-700 dark:text-gray-300"
-                    >
-                      {word}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
+            )}
 
             {/* Audio Visualization */}
             {recordingState === 'recording' && (
@@ -509,39 +660,84 @@ export default function RecordPage() {
                   </div>
                 </div>
 
-                {/* Score Overview */}
-                <div className="mb-6 grid grid-cols-3 gap-4">
-                  <div className="text-center">
-                    <div
-                      className={`text-2xl font-bold ${getScoreColor(assessment.overallScore)}`}
-                    >
-                      {assessment.overallScore}%
+                {/* Score Overview - Different for each mode */}
+                {practiceMode === 'text-based' ? (
+                  <div className="mb-6 grid grid-cols-3 gap-4">
+                    <div className="text-center">
+                      <div
+                        className={`text-2xl font-bold ${getScoreColor(assessment.overallScore)}`}
+                      >
+                        {assessment.overallScore}%
+                      </div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
+                        Overall
+                      </div>
                     </div>
-                    <div className="text-sm text-gray-600 dark:text-gray-400">
-                      Overall
+                    <div className="text-center">
+                      <div
+                        className={`text-2xl font-bold ${getScoreColor(assessment.accuracyScore || 0)}`}
+                      >
+                        {assessment.accuracyScore || 0}%
+                      </div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
+                        Accuracy
+                      </div>
+                    </div>
+                    <div className="text-center">
+                      <div
+                        className={`text-2xl font-bold ${getScoreColor(assessment.fluencyScore)}`}
+                      >
+                        {assessment.fluencyScore}%
+                      </div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
+                        Fluency
+                      </div>
                     </div>
                   </div>
-                  <div className="text-center">
-                    <div
-                      className={`text-2xl font-bold ${getScoreColor(assessment.accuracyScore)}`}
-                    >
-                      {assessment.accuracyScore}%
+                ) : (
+                  <div className="mb-6 grid grid-cols-2 gap-4">
+                    <div className="text-center">
+                      <div
+                        className={`text-2xl font-bold ${getScoreColor(assessment.overallScore)}`}
+                      >
+                        {assessment.overallScore}%
+                      </div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
+                        Overall
+                      </div>
                     </div>
-                    <div className="text-sm text-gray-600 dark:text-gray-400">
-                      Accuracy
+                    <div className="text-center">
+                      <div
+                        className={`text-2xl font-bold ${getScoreColor(assessment.fluencyScore)}`}
+                      >
+                        {assessment.fluencyScore}%
+                      </div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
+                        Fluency
+                      </div>
+                    </div>
+                    <div className="text-center">
+                      <div
+                        className={`text-2xl font-bold ${getScoreColor(assessment.clarityScore || 0)}`}
+                      >
+                        {assessment.clarityScore || 0}%
+                      </div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
+                        Clarity
+                      </div>
+                    </div>
+                    <div className="text-center">
+                      <div
+                        className={`text-2xl font-bold ${getScoreColor(assessment.grammarScore || 0)}`}
+                      >
+                        {assessment.grammarScore || 0}%
+                      </div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
+                        Grammar
+                      </div>
                     </div>
                   </div>
-                  <div className="text-center">
-                    <div
-                      className={`text-2xl font-bold ${getScoreColor(assessment.fluencyScore)}`}
-                    >
-                      {assessment.fluencyScore}%
-                    </div>
-                    <div className="text-sm text-gray-600 dark:text-gray-400">
-                      Fluency
-                    </div>
-                  </div>
-                </div>
+                )}
 
                 {/* Suggestions */}
                 <div className="space-y-3">

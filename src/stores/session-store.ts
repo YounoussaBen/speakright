@@ -13,6 +13,7 @@ import {
   where,
 } from 'firebase/firestore';
 import { create } from 'zustand';
+import type { FreeSpeechAssessment } from '@/lib/types';
 
 export interface PronunciationAssessment {
   overallScore: number;
@@ -35,14 +36,15 @@ export interface PronunciationAssessment {
 export interface SessionData {
   id?: string;
   userId?: string | undefined;
-  originalText: string;
+  sessionType: 'text-based' | 'free-speech'; // Type of practice session
+  originalText: string; // Empty for free-speech sessions
   transcribedText: string;
   audioUrl?: string;
-  assessment: PronunciationAssessment;
+  assessment: PronunciationAssessment | FreeSpeechAssessment; // Support both types
   metadata: {
     duration: number;
     wordCount: number;
-    sourceType: 'manual' | 'file' | 'sample';
+    sourceType: 'manual' | 'file' | 'sample' | 'free-speech';
     sourceFileName?: string;
   };
   createdAt: Date;

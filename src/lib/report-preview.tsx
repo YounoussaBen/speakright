@@ -144,13 +144,42 @@ export function ReportPreview({
 
   // Summary Page Component
   const SummaryPage = () => {
-    const scores = [
-      { label: 'Overall Score', value: session.assessment.overallScore },
-      { label: 'Accuracy Score', value: session.assessment.accuracyScore },
-      { label: 'Fluency Score', value: session.assessment.fluencyScore },
-    ];
+    // Conditional scores based on session type
+    const scores =
+      session.sessionType === 'text-based'
+        ? [
+            { label: 'Overall Score', value: session.assessment.overallScore },
+            {
+              label: 'Accuracy Score',
+              value:
+                'accuracyScore' in session.assessment
+                  ? session.assessment.accuracyScore
+                  : 0,
+            },
+            { label: 'Fluency Score', value: session.assessment.fluencyScore },
+          ]
+        : [
+            { label: 'Overall Score', value: session.assessment.overallScore },
+            { label: 'Fluency Score', value: session.assessment.fluencyScore },
+            {
+              label: 'Clarity Score',
+              value:
+                'clarityScore' in session.assessment
+                  ? session.assessment.clarityScore
+                  : 0,
+            },
+            {
+              label: 'Grammar Score',
+              value:
+                'grammarScore' in session.assessment
+                  ? session.assessment.grammarScore
+                  : 0,
+            },
+          ];
 
-    const wrappedOriginal = wrapText(session.originalText, 65);
+    const wrappedOriginal = session.originalText
+      ? wrapText(session.originalText, 65)
+      : [];
     const wrappedTranscribed = wrapText(session.transcribedText, 65);
 
     return (
@@ -196,19 +225,25 @@ export function ReportPreview({
           ))}
         </div>
 
-        {/* Original Text Section */}
-        <div className="mb-8">
-          <h3 className="mb-3 text-sm font-bold" style={{ color: '#333333' }}>
-            Original Text:
-          </h3>
-          <div className="space-y-1">
-            {wrappedOriginal.map((line, index) => (
-              <div key={index} className="text-xs" style={{ color: '#999999' }}>
-                {line}
-              </div>
-            ))}
+        {/* Original Text Section - Only for text-based sessions */}
+        {session.sessionType === 'text-based' && wrappedOriginal.length > 0 && (
+          <div className="mb-8">
+            <h3 className="mb-3 text-sm font-bold" style={{ color: '#333333' }}>
+              Original Text:
+            </h3>
+            <div className="space-y-1">
+              {wrappedOriginal.map((line, index) => (
+                <div
+                  key={index}
+                  className="text-xs"
+                  style={{ color: '#999999' }}
+                >
+                  {line}
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Transcribed Text Section */}
         <div>
@@ -229,6 +264,11 @@ export function ReportPreview({
 
   // Word Breakdown Page Component
   const WordBreakdownPage = () => {
+    // Type guard: Only render for text-based sessions
+    if (!('wordLevelScores' in session.assessment)) {
+      return null;
+    }
+
     const wordData = session.assessment.wordLevelScores.slice(0, 20);
     const correctWords = wordData.filter(w => w.score >= 80).length;
     const totalWords = wordData.length;
@@ -397,14 +437,26 @@ export function ReportPreview({
     );
   };
 
+  // Conditionally include Word Breakdown page only for text-based sessions
   const pages = [
     <CoverPage key="cover" />,
     <SummaryPage key="summary" />,
-    <WordBreakdownPage key="breakdown" />,
+    ...(session.sessionType === 'text-based' &&
+    'wordLevelScores' in session.assessment
+      ? [<WordBreakdownPage key="breakdown" />]
+      : []),
     <SuggestionsPage key="suggestions" />,
   ];
 
-  const pageTitles = ['Cover', 'Summary', 'Word Analysis', 'Suggestions'];
+  const pageTitles = [
+    'Cover',
+    'Summary',
+    ...(session.sessionType === 'text-based' &&
+    'wordLevelScores' in session.assessment
+      ? ['Word Analysis']
+      : []),
+    'Suggestions',
+  ];
 
   if (!isOpen) return null;
 
